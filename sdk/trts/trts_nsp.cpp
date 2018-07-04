@@ -30,12 +30,12 @@
  */
 
 /* Implement functions:
- *         init_stack_guard() 
+ *         init_stack_guard()
  *         enter_enclave()
  *
  *  The functions in this source file will be called during the stack guard initialization.
  *  They cannot be built with '-fstack-protector-strong'. Otherwise, stack guard check will
- *  be failed before the function returns and 'ud2' will be triggered. 
+ *  be failed before the function returns and 'ud2' will be triggered.
 */
 
 #include "sgx_trts.h"
@@ -69,6 +69,42 @@ static void init_stack_guard(void *tcs)
         abort();
 
     thread_data->stack_guard = tmp_stack_guard;
+}
+
+
+#define UPDATE_FS 10
+#define UPDATE_GS 20
+
+void _update_fsgsbase(int idx, thread_data_t* td_new)
+{
+    thread_data_t *td_cur = get_thread_data();
+    assert (td_cur != NULL);
+
+    void* tcs = td_cur->tcs;
+    assert(tcs != NULL);
+
+    thread_data_t *td_tcs = GET_PTR(thread_data_t, tcs, g_global_data.td_template.self_addr);
+    assert(td_tcs != NULL);
+
+    if (idx == UPDATE_FS) {
+        td_tcs->fsbase = td_new;
+        asm volatile ( "wrfsbase %0" :: "a" (td_new) );
+    }
+
+    if (idx == UPDATE_GS) {
+        td_tcs->gsbase = td_new;
+        asm volatile ( "wrgsbase %0" :: "a" (td_new) );
+    }
+}
+
+extern "C" void update_fsbase(sys_word_t base)
+{
+    _update_fsgsbase(UPDATE_FS, (thread_data_t*)base);
+}
+
+extern "C" void update_gsbase(sys_word_t base)
+{
+    _update_fsgsbase(UPDATE_GS, (thread_data_t*)base);
 }
 
 extern "C" int enter_enclave(int index, void *ms, void *tcs, int cssa)

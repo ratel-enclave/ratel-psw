@@ -243,7 +243,7 @@ static sgx_status_t trts_ecall(uint32_t ordinal, void *ms)
         ecall_func_t func = (ecall_func_t)addr;
         status = func(ms);
     }
-    
+
     return status;
 }
 
@@ -267,41 +267,65 @@ static bool is_utility_thread()
     }
 }
 
+static void _init_thread_data(void* tcs, thread_data_t *td)
+{
+    size_t stack_guard = td->stack_guard;
+    size_t thread_flags = td->flags;
+    memcpy_s(td, SE_PAGE_SIZE, const_cast<thread_data_t *>(&g_global_data.td_template), sizeof(thread_data_t));
+    td->last_sp += (size_t)tcs;
+    td->self_addr += (size_t)tcs;
+    td->stack_base_addr += (size_t)tcs;
+    td->stack_limit_addr += (size_t)tcs;
+    td->stack_commit_addr = td->stack_limit_addr;
+    td->first_ssa_gpr += (size_t)tcs;
+    td->tls_array += (size_t)tcs;
+    td->tls_addr += (size_t)tcs;
+
+    td->last_sp -= (size_t)STATIC_STACK_SIZE;
+    td->stack_base_addr -= (size_t)STATIC_STACK_SIZE;
+    td->stack_guard = stack_guard;
+    td->flags = thread_flags;
+    init_static_stack_canary(tcs);
+
+    td->tcs = tcs;
+    td->fsbase = td;
+    td->gsbase = td;
+}
+
+extern "C" void init_thread_data(thread_data_t *td)
+{
+    thread_data_t *td_cur = get_thread_data();
+    assert (td_cur != NULL);
+
+    void* tcs = td_cur->tcs;
+    assert(tcs != NULL);
+
+    _init_thread_data(tcs, td);
+}
+
 sgx_status_t do_init_thread(void *tcs)
 {
     thread_data_t *thread_data = GET_PTR(thread_data_t, tcs, g_global_data.td_template.self_addr);
-#ifndef SE_SIM
-    size_t saved_stack_commit_addr = thread_data->stack_commit_addr; 
+
+    assert(thread_data != NULL);
+
+    #ifndef SE_SIM
+    size_t saved_stack_commit_addr = thread_data->stack_commit_addr;
     bool thread_first_init = (saved_stack_commit_addr == 0) ? true : false;
 #endif
-    size_t stack_guard = thread_data->stack_guard;
-    size_t thread_flags = thread_data->flags;
-    memcpy_s(thread_data, SE_PAGE_SIZE, const_cast<thread_data_t *>(&g_global_data.td_template), sizeof(thread_data_t));
-    thread_data->last_sp += (size_t)tcs;
-    thread_data->self_addr += (size_t)tcs;
-    thread_data->stack_base_addr += (size_t)tcs;
-    thread_data->stack_limit_addr += (size_t)tcs;
-    thread_data->stack_commit_addr = thread_data->stack_limit_addr;
-    thread_data->first_ssa_gpr += (size_t)tcs;
-    thread_data->tls_array += (size_t)tcs;
-    thread_data->tls_addr += (size_t)tcs;
 
-    thread_data->last_sp -= (size_t)STATIC_STACK_SIZE;
-    thread_data->stack_base_addr -= (size_t)STATIC_STACK_SIZE;
-    thread_data->stack_guard = stack_guard;
-    thread_data->flags = thread_flags;
-    init_static_stack_canary(tcs);
+    _init_thread_data(tcs, thread_data);
 
 #ifndef SE_SIM
     if (EDMM_supported && is_dynamic_thread(tcs))
     {
         if (thread_first_init)
-        {   
+        {
             uint32_t page_count = get_dynamic_stack_max_page();
             thread_data->stack_commit_addr += ((sys_word_t)page_count << SE_PAGE_SHIFT);
         }
         else
-        {   
+        {
             thread_data->stack_commit_addr = saved_stack_commit_addr;
         }
     }
@@ -323,6 +347,22 @@ sgx_status_t do_init_thread(void *tcs)
     return SGX_SUCCESS;
 }
 
+
+//Support creating new fs/gs segment in enclave
+static void load_fsgsbase(thread_data_t *td)
+{
+    assert(td != NULL);
+
+    if (td->fsbase != td) {
+        asm volatile ( "wrfsbase %0" :: "a" (td->fsbase) );
+    }
+
+    if (td->gsbase != td) {
+        asm volatile ( "wrgsbase %0" :: "a" (td->gsbase) );
+    }
+}
+
+
 sgx_status_t do_ecall(int index, void *ms, void *tcs)
 {
     sgx_status_t status = SGX_ERROR_UNEXPECTED;
@@ -331,7 +371,7 @@ sgx_status_t do_ecall(int index, void *ms, void *tcs)
         return status;
     }
     thread_data_t *thread_data = get_thread_data();
-    if( (NULL == thread_data) || ((thread_data->stack_base_addr == thread_data->last_sp) && (0 != g_global_data.thread_policy)))
+    if (NULL == thread_data)// || ((thread_data->stack_base_addr == thread_data->last_sp) && (0 != g_global_data.thread_policy)))
     {
         status = do_init_thread(tcs);
         if(0 != status)
@@ -339,6 +379,8 @@ sgx_status_t do_ecall(int index, void *ms, void *tcs)
             return status;
         }
     }
+    assert(thread_data != NULL);
+    load_fsgsbase(thread_data);
     status = trts_ecall(index, ms);
     return status;
 }
@@ -402,7 +444,7 @@ sgx_status_t do_uninit_enclave(void *tcs)
 #ifndef SE_SIM
     if(is_dynamic_thread_exist() && !is_utility_thread())
         return SGX_ERROR_UNEXPECTED;
-#endif        
+#endif
     sgx_spin_lock(&g_tcs_node_lock);
     tcs_node_t *tcs_node = g_tcs_node;
     g_tcs_node = NULL;

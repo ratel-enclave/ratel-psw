@@ -33,7 +33,7 @@
 /**
  * File: init_enclave.cpp
  * Description:
- *     Initialize enclave by rebasing the image to the enclave base 
+ *     Initialize enclave by rebasing the image to the enclave base
  */
 
 #include <string.h>
@@ -54,8 +54,8 @@ uint64_t g_cpu_feature_indicator = 0;
 int EDMM_supported = 0;
 sdk_version_t g_sdk_version = SDK_VERSION_1_5;
 
-const volatile global_data_t g_global_data = {1, 2, 3, 4,  
-   {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, {0, 0, 0, 0, 0, 0}, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 0, 0, {{{0, 0, 0, 0, 0, 0, 0}}}};
+const volatile global_data_t g_global_data = {1, 2, 3, 4,
+   {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, {0, 0, 0, 0, 0, 0}, 0, NULL, NULL, NULL}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 0, 0, {{{0, 0, 0, 0, 0, 0, 0}}}};
 uint32_t g_enclave_state = ENCLAVE_INIT_NOT_STARTED;
 
 extern "C" {
@@ -129,7 +129,7 @@ extern "C" int init_enclave(void *enclave_base, void *ms)
 			return -1;
 		}
 	}
-	
+
     if(SGX_SUCCESS != sgx_read_rand((unsigned char*)&__stack_chk_guard,
                                      sizeof(__stack_chk_guard)))
     {
@@ -167,7 +167,7 @@ sgx_status_t do_init_enclave(void *ms, void *tcs)
 
     do_init_thread(tcs);
     thread_data->flags = SGX_UTILITY_THREAD;
-    
+
 
     /* for EDMM, we need to accept the trimming of the POST_REMOVE pages. */
     if (EDMM_supported)

@@ -80,7 +80,7 @@
 #define OCALL_FLAG          0x04F434944
 
 #define dtv    SE_WORDSIZE
-#define tls    0 
+#define tls    0
 .macro READ_TD_DATA offset
 #ifdef SE_SIM
 /* TLS support in simulation mode
@@ -101,9 +101,9 @@
 #else /* SE_SIM */
 
 #if defined(LINUX32)
-    mov     %fs:\offset, %xax
-#elif defined(LINUX64)
     mov     %gs:\offset, %xax
+#elif defined(LINUX64)
+    mov     %fs:\offset, %xax
 #endif
 
 #endif /* !SE_SIM */

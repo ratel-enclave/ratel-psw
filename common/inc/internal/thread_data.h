@@ -112,6 +112,9 @@ typedef struct _thread_data_t
 #endif
     sys_word_t  cxx_thread_info[6];
     sys_word_t  stack_commit_addr;
+    void *tcs;                      /* Point to the TCS of current enclave thread */
+    struct _thread_data_t *fsbase;  /* Store the latest value of fsbase and gsbase */
+    struct _thread_data_t *gsbase;  /* Load them when EENTER */
 } thread_data_t;
 
 #ifdef __cplusplus
@@ -119,6 +122,12 @@ extern "C" {
 #endif
 
 thread_data_t *get_thread_data(void);
+
+
+void init_thread_data(thread_data_t *td);
+void update_fsbase(sys_word_t base);
+void update_gsbase(sys_word_t base);
+
 
 #ifdef __cplusplus
 }
