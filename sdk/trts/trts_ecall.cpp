@@ -349,12 +349,14 @@ sgx_status_t do_init_thread(void *tcs)
 
 
 //Support creating new fs/gs segment in enclave
-static void load_fsgsbase(thread_data_t *td)
+void load_fsgsbase(thread_data_t **ptd)
 {
-    assert(td != NULL);
+    assert(ptd != NULL && *ptd != NULL);
 
+    thread_data_t *td = *ptd;
     if (td->fsbase != td) {
         asm volatile ( "wrfsbase %0" :: "a" (td->fsbase) );
+        *ptd = td->fsbase;  /* FS is used for sgx-sdk TLS */
     }
 
     if (td->gsbase != td) {
@@ -380,7 +382,8 @@ sgx_status_t do_ecall(int index, void *ms, void *tcs)
         }
     }
     assert(thread_data != NULL);
-    load_fsgsbase(thread_data);
+    load_fsgsbase(&thread_data);
+    
     status = trts_ecall(index, ms);
     return status;
 }

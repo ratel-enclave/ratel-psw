@@ -105,6 +105,8 @@ uintptr_t update_ocall_lastsp(ocall_context_t* context)
 sgx_status_t do_oret(void *ms)
 {
     thread_data_t *thread_data = get_thread_data();
+    load_fsgsbase(&thread_data);
+
     uintptr_t last_sp = thread_data->last_sp;
     ocall_context_t *context = reinterpret_cast<ocall_context_t*>(thread_data->last_sp);
     if(0 == last_sp || last_sp <= (uintptr_t)&context)
