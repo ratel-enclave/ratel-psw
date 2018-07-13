@@ -52,6 +52,8 @@
 # define assert(e) ((e) ? (void)0 : __assert(__FILE__, __LINE__, __func__, #e))
 #endif
 
+#define yph_assert(e) assert(e)
+
 #ifndef _ASSERT_H_DECLS
 #define _ASSERT_H_DECLS
 __BEGIN_DECLS

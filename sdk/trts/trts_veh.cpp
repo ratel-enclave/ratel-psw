@@ -302,7 +302,6 @@ static int expand_stack_by_pages(void *start_addr, size_t page_count)
 extern "C" sgx_status_t trts_handle_exception(void *tcs)
 {
     thread_data_t *thread_data = get_thread_data();
-    load_fsgsbase(&thread_data);
 
     ssa_gpr_t *ssa_gpr = NULL;
     sgx_exception_info_t *info = NULL;

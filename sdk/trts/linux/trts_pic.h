@@ -67,6 +67,9 @@
 #define xsave_size          (SE_WORDSIZE * 7)
 #define self_addr           0
 #define stack_guard         (SE_WORDSIZE * 5)
+#define master_flag			(SE_WORDSIZE *20)
+#define fsbase				(SE_WORDSIZE *21)
+#define gsbase				(SE_WORDSIZE *22)
 
 /* SSA GPR */
 #define ssa_sp_t            32
@@ -113,3 +116,26 @@
     mov      \tcs, %xax
     sub      $SE_GUARD_PAGE_SIZE, %xax
 .endm
+
+
+.macro PUSH_GPR
+    push    %xax
+    push    %xdi
+    push    %xsi
+    push    %xdx
+    push    %xcx
+    push    %r8
+    push    %r9
+ .endm
+
+
+.macro POP_GPR
+    pop    %r9
+    pop    %r8
+    pop    %xcx
+    pop    %xdx
+    pop    %xsi
+    pop    %xdi
+    pop    %xax
+.endm
+

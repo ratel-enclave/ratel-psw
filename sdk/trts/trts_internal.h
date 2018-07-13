@@ -74,7 +74,6 @@ sgx_status_t do_ecall_add_thread(void *ms, void *tcs);
 sgx_status_t do_uninit_enclave(void *tcs);
 int check_static_stack_canary(void *tcs);
 
-void load_fsgsbase(thread_data_t **ptd);
 #ifdef __cplusplus
 }
 #endif

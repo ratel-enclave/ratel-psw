@@ -267,7 +267,7 @@ static bool is_utility_thread()
     }
 }
 
-static void _init_thread_data(void* tcs, thread_data_t *td)
+static void _init_master_thread_data(void* tcs, thread_data_t *td)
 {
     size_t stack_guard = td->stack_guard;
     size_t thread_flags = td->flags;
@@ -287,20 +287,18 @@ static void _init_thread_data(void* tcs, thread_data_t *td)
     td->flags = thread_flags;
     init_static_stack_canary(tcs);
 
-    td->tcs = tcs;
+    td->master_tls_segment = 1; /* true */
     td->fsbase = td;
     td->gsbase = td;
 }
 
-extern "C" void init_thread_data(thread_data_t *td)
+extern "C" void init_slave_thread_data(thread_data_t *td)
 {
     thread_data_t *td_cur = get_thread_data();
-    assert (td_cur != NULL);
-
-    void* tcs = td_cur->tcs;
-    assert(tcs != NULL);
-
-    _init_thread_data(tcs, td);
+    assert(td != NULL && td_cur != NULL);
+    *td = *td_cur;
+    td->self_addr = (sys_word_t)td;
+    td->master_tls_segment = 0; /* false */
 }
 
 sgx_status_t do_init_thread(void *tcs)
@@ -314,7 +312,7 @@ sgx_status_t do_init_thread(void *tcs)
     bool thread_first_init = (saved_stack_commit_addr == 0) ? true : false;
 #endif
 
-    _init_thread_data(tcs, thread_data);
+    _init_master_thread_data(tcs, thread_data);
 
 #ifndef SE_SIM
     if (EDMM_supported && is_dynamic_thread(tcs))
@@ -347,24 +345,6 @@ sgx_status_t do_init_thread(void *tcs)
     return SGX_SUCCESS;
 }
 
-
-//Support creating new fs/gs segment in enclave
-void load_fsgsbase(thread_data_t **ptd)
-{
-    assert(ptd != NULL && *ptd != NULL);
-
-    thread_data_t *td = *ptd;
-    if (td->fsbase != td) {
-        asm volatile ( "wrfsbase %0" :: "a" (td->fsbase) );
-        *ptd = td->fsbase;  /* FS is used for sgx-sdk TLS */
-    }
-
-    if (td->gsbase != td) {
-        asm volatile ( "wrgsbase %0" :: "a" (td->gsbase) );
-    }
-}
-
-
 sgx_status_t do_ecall(int index, void *ms, void *tcs)
 {
     sgx_status_t status = SGX_ERROR_UNEXPECTED;
@@ -381,9 +361,7 @@ sgx_status_t do_ecall(int index, void *ms, void *tcs)
             return status;
         }
     }
-    assert(thread_data != NULL);
-    load_fsgsbase(&thread_data);
-    
+
     status = trts_ecall(index, ms);
     return status;
 }

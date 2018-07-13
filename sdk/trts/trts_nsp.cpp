@@ -72,40 +72,120 @@ static void init_stack_guard(void *tcs)
 }
 
 
+
+//#if defined(LINUX64)
+
 #define UPDATE_FS 10
 #define UPDATE_GS 20
 
-void _update_fsgsbase(int idx, thread_data_t* td_new)
+static inline void __propagate_thread_data(thread_data_t* td_new, thread_data_t* td_cur)
 {
+    assert(td_new != NULL && td_cur != NULL);
+    td_new->last_sp = td_cur->last_sp;
+    td_new->first_ssa_gpr = td_cur->first_ssa_gpr;
+    td_new->last_error = td_cur->last_error;
+    td_new->exception_flag = td_cur->exception_flag;
+    td_new->stack_commit_addr = td_cur->stack_commit_addr;
+}
+
+extern "C" {
+
+void load_fsbase(sys_word_t base)
+{
+    thread_data_t *td_new = (thread_data_t*)base;
     thread_data_t *td_cur = get_thread_data();
-    assert (td_cur != NULL);
 
-    void* tcs = td_cur->tcs;
-    assert(tcs != NULL);
+    assert (td_new != NULL && td_cur != NULL);
 
-    thread_data_t *td_tcs = GET_PTR(thread_data_t, tcs, g_global_data.td_template.self_addr);
-    assert(td_tcs != NULL);
+    //The same td instance?
+    if (td_new == td_cur)
+        return;
 
-    if (idx == UPDATE_FS) {
-        td_tcs->fsbase = td_new;
-        asm volatile ( "wrfsbase %0" :: "a" (td_new) );
-    }
+    __propagate_thread_data(td_new, td_cur);
 
-    if (idx == UPDATE_GS) {
-        td_tcs->gsbase = td_new;
-        asm volatile ( "wrgsbase %0" :: "a" (td_new) );
-    }
+    thread_data_t *td_master = NULL;
+    if (td_new->master_tls_segment)
+        td_master = td_new;
+    else if (td_cur->master_tls_segment)
+        td_master = td_cur;
+    else
+        td_master = td_cur->fsbase;
+
+    assert (td_master != NULL);
+    td_master->fsbase = td_new;
+    asm volatile ( "wrfsbase %0" :: "a" (td_new) );
 }
 
-extern "C" void update_fsbase(sys_word_t base)
+
+void load_gsbase(sys_word_t base)
 {
-    _update_fsgsbase(UPDATE_FS, (thread_data_t*)base);
+    thread_data_t *td_new = (thread_data_t*)base;
+    thread_data_t *td_cur = get_thread_data();  /* fs-segmetn */
+
+    assert (td_new != NULL && td_cur != NULL);
+
+
+    thread_data_t *td_master = NULL;
+    if (td_cur->master_tls_segment)
+        td_master = td_cur;
+    else
+        td_master = td_cur->fsbase;
+    assert (td_master != NULL);
+
+    thread_data_t *td_gs = td_master->gsbase;
+
+    //The same td instance?
+    if (td_new == td_gs)
+        return;
+
+    td_master->gsbase = td_new;
+    asm volatile ( "wrgsbase %0" :: "a" (td_new) );
 }
 
-extern "C" void update_gsbase(sys_word_t base)
+
+void _eenter_load_slave_tls(void)
 {
-    _update_fsgsbase(UPDATE_GS, (thread_data_t*)base);
+    thread_data_t *td_master = get_thread_data();
+
+    /* initialized? */
+    if (td_master == NULL)
+        return;
+
+    assert(td_master->master_tls_segment == 1);
+
+    thread_data_t *td_fs = td_master->fsbase;
+    thread_data_t *td_gs = td_master->gsbase;
+    assert(td_fs != NULL);
+    assert(td_gs != NULL);
+
+    if (td_fs != td_master)
+        asm volatile ( "wrfsbase %0" :: "a" (td_fs) );
+
+    if (td_gs != td_master)
+        asm volatile ( "wrgsbase %0" :: "a" (td_gs) );
 }
+
+
+void _eexit_update_master_tls(void)
+{
+    thread_data_t *td = get_thread_data();
+    assert(td != NULL);
+
+    if (td->master_tls_segment) {
+        //do nothing
+    }
+    else {
+        //update master tls then load it
+        thread_data_t *td_master = td->fsbase;
+        assert(td_master != NULL);
+
+        __propagate_thread_data(td_master, td);
+    }
+}
+
+}
+//#endif
+
 
 extern "C" int enter_enclave(int index, void *ms, void *tcs, int cssa)
 {

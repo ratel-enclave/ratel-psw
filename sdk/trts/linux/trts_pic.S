@@ -67,7 +67,7 @@ DECLARE_LOCAL_FUNC lock_enclave
     lock cmpxchgl %ecx, (%xdx)                  /*   g_global_data.enclave_state == ENCLAVE_INIT_IN_PROGRESS */
     ret                                         /* xax: the initial value of enclave state */
 
-/* 
+/*
  * ---------------------------------------------------------------------
  * Function: thread_data_t* get_thread_data(void);
  *
@@ -75,21 +75,21 @@ DECLARE_LOCAL_FUNC lock_enclave
  * ---------------------------------------------------------------------
  */
 DECLARE_LOCAL_FUNC get_thread_data
-    READ_TD_DATA self_addr 
+    READ_TD_DATA self_addr
     ret
 
-/* 
+/*
  * ---------------------------------------------------------------------
  * Function: sys_word_t get_stack_guard(void);
  *
  *     Get the value of stack_guard
  * ---------------------------------------------------------------------
  */
-DECLARE_LOCAL_FUNC get_stack_guard 
-    READ_TD_DATA stack_guard 
+DECLARE_LOCAL_FUNC get_stack_guard
+    READ_TD_DATA stack_guard
     ret
-    
-/* 
+
+/*
  * ---------------------------------------------------------------------
  * Function: enclave_entry
  *      The entry point of the enclave.
@@ -102,7 +102,7 @@ DECLARE_LOCAL_FUNC get_stack_guard
  *      XSI - the pointer to the marshalling structure
  */
 DECLARE_GLOBAL_FUNC enclave_entry
-/* 
+/*
  * ----------------------------------------------------------------------
  * Dispatch code according to CSSA and the reason of EENTER
  *      eax >   0 - exception handler
@@ -124,6 +124,13 @@ DECLARE_GLOBAL_FUNC enclave_entry
     sub     $STATIC_STACK_SIZE, %xax    /* give space for static stack */
 .Lswitch_stack:
     xchg    %xsp, %xax
+
+#if defined(LINUX64)
+    PUSH_GPR
+    call    _eenter_load_slave_tls
+    POP_GPR
+#endif
+
     push    %xcx
     push    %xbp
 
@@ -159,6 +166,12 @@ DECLARE_GLOBAL_FUNC enclave_entry
     mov     $OCMD_ERET, %xdi
     mov     %xbx, %xsi
 
+#if defined(LINUX64)
+    PUSH_GPR
+    call    _eexit_update_master_tls
+    POP_GPR
+#endif
+
 /* restore stack */
     mov     -1*SE_WORDSIZE(%xbp), %xdx  /* xdx: xsp_u  */
     mov     %xbp, %xsp
@@ -170,6 +183,7 @@ DECLARE_GLOBAL_FUNC enclave_entry
     /* Clear all GPRs, except xax, xbx, xdi and xsi */
     xor     %xcx, %xcx
     xor     %xdx, %xdx
+
 #if defined(LINUX64)
     xor     %r8, %r8
     xor     %r9, %r9
@@ -194,14 +208,14 @@ DECLARE_GLOBAL_FUNC enclave_entry
 .Ldo_handler:
     mov     %xax, %xdx          /* XDX: cssa */
     GET_STACK_BASE %xbx         /* XAX: static stack, set sp to stack base */
-    jmp     .Lswitch_stack   
- 
+    jmp     .Lswitch_stack
+
     /* Should not come here */
     ud2
-    
+
     .cfi_endproc
 
-/* 
+/*
  * -------------------------------------------------------------------------
  *  sgx_status_t do_ocall(unsigned int index, void *ms);
  *
@@ -250,7 +264,7 @@ DECLARE_GLOBAL_FUNC enclave_entry
  */
 DECLARE_LOCAL_FUNC do_ocall
 
-/* 
+/*
  * 8 for GPR, 1 for TD.last_sp, 1 for ocall_index
  * 1 for OCALL_FLAG, 4 for shadow space.
  * Stack Pointer is 16-byte aligned under x86_64.
@@ -323,7 +337,7 @@ DECLARE_LOCAL_FUNC do_ocall
      *     set TD.last_sp = xsp
      */
     READ_TD_DATA self_addr
-    mov     %xax, %xbx 
+    mov     %xax, %xbx
 
     /* call update_ocall_lastsp */
 #ifdef LINUX32
@@ -331,12 +345,18 @@ DECLARE_LOCAL_FUNC do_ocall
 #else
     mov     %xsp, %xdi
 #endif
-    
+
     call    update_ocall_lastsp         /* xax: td.last_sp */
 
 #ifdef LINUX64
     mov     SE_WORDSIZE*12(%xsp), %xdi   /* restore xdi */
     mov     SE_WORDSIZE*13(%xsp), %xsi   /* restore xdi */
+#endif
+
+#if defined(LINUX64)
+    PUSH_GPR
+    call    _eexit_update_master_tls
+    POP_GPR
 #endif
 
     /* restore outside stack context */
@@ -446,7 +466,7 @@ DECLARE_GLOBAL_FUNC asm_oret
     /* should not come here */
     ud2
 
-/* 
+/*
  * ------------------------------------------------------------------------
  * extern "C" int do_egetkey(key_request_t *key_request, key_128bit_t *key)
  * return value:
@@ -471,7 +491,7 @@ DECLARE_LOCAL_FUNC do_egetkey
     SE_EPILOG
 
 
-/* 
+/*
  * -------------------------------------------------------------------------
  * extern "C" void do_ereport(sgx_target_info_t *target_info, sgx_report_data_t *report_data, sgx_report_t *report);
  * EREPORT: rbx - the address of TARGETINFO;
@@ -484,23 +504,23 @@ DECLARE_LOCAL_FUNC do_ereport
     mov       $SE_EREPORT, %xax  /* EREPORT leaf */
     ENCLU
     SE_EPILOG
-    
+
 DECLARE_GLOBAL_FUNC do_eaccept
     SE_PROLOG
     mov     $SE_EACCEPT, %eax
     ENCLU
-    cmp  $SGX_SUCCESS, %eax 
-    jnz	 abort 
+    cmp  $SGX_SUCCESS, %eax
+    jnz	 abort
     SE_EPILOG
 
 DECLARE_GLOBAL_FUNC do_emodpe
     SE_PROLOG
-    mov     $SE_EMODPE, %eax 
+    mov     $SE_EMODPE, %eax
     ENCLU
     SE_EPILOG
 
-#define _RDRAND_RETRY_TIMES 10	
-/* 
+#define _RDRAND_RETRY_TIMES 10
+/*
  * -------------------------------------
  * extern "C" uint32_t do_rdrand(uint32_t *rand);
  * return value:
@@ -537,7 +557,7 @@ DECLARE_LOCAL_FUNC abort
     movl    $ENCLAVE_CRASHED, (%xax)
     ud2
 
-/* 
+/*
  * -------------------------------------------------------------------------
  * extern "C" __attribute__((regparm(1))) void continue_execution(sgx_exception_info_t *info);
  * -------------------------------------------------------------------------

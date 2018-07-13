@@ -112,9 +112,10 @@ typedef struct _thread_data_t
 #endif
     sys_word_t  cxx_thread_info[6];
     sys_word_t  stack_commit_addr;
-    void *tcs;                      /* Point to the TCS of current enclave thread */
-    struct _thread_data_t *fsbase;  /* Store the latest value of fsbase and gsbase */
-    struct _thread_data_t *gsbase;  /* Load them when EENTER */
+    sys_word_t  master_tls_segment; /* is master fs/gs segment or not? */
+    /*Load them when EENTERing */
+    struct _thread_data_t *fsbase;  /* 1. for master fs/gs-segment, always points to current fs/gs-segment */
+    struct _thread_data_t *gsbase;  /* 2. for slave fs/gs-segment, always points to master fs/gs-segment */
 } thread_data_t;
 
 #ifdef __cplusplus
@@ -123,11 +124,18 @@ extern "C" {
 
 thread_data_t *get_thread_data(void);
 
+#if defined(LINUX64)
+void init_slave_thread_data(thread_data_t *td);
+void load_fsbase(sys_word_t base);
+void load_gsbase(sys_word_t base);
 
-void init_thread_data(thread_data_t *td);
-void update_fsbase(sys_word_t base);
-void update_gsbase(sys_word_t base);
+#else
 
+#define init_slave_thread_data(x)
+#define update_fsbase(x)
+#define update_gsbase(x)
+
+#endif
 
 #ifdef __cplusplus
 }
