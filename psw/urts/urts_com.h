@@ -80,7 +80,7 @@ static int validate_platform()
     // The compatibility between SDK and PSW is checked by the metadata version.
     // Below check the compatibility between the platform and uRTS only.
 
-    
+
     // It is HSW users' responsibility to make the uRTS version to consistent with the HSW patch.
     if(cpu_info[0] == HSW_C0)
     {
@@ -93,7 +93,7 @@ static int validate_platform()
         SE_TRACE(SE_TRACE_ERROR, "ERROR: The enclave cannot be launched on current platform.\n");
         return SGX_ERROR_INVALID_VERSION;
     }
-    
+
     return SGX_SUCCESS;
 }
 #endif
@@ -119,6 +119,7 @@ static sgx_status_t get_metadata(BinParser *parser, const int debug, metadata_t 
 #endif
 
     //scan multiple metadata list in sgx_metadata section
+    YPHPRINT("scan multiple metadata list in sgx_metadata section");
     meta_rva = parser->get_metadata_offset();
     do {
         *metadata = GET_PTR(metadata_t, base_addr, meta_rva);
@@ -188,6 +189,7 @@ static int __create_enclave(BinParser &parser, uint8_t* base_addr, const metadat
     // After enclave is created, "parser" and "loader" are not needed any more.
     debug_enclave_info_t *debug_info = NULL;
     int ret = SGX_SUCCESS;
+    YPHPRINT("create CLoader and ->CLoader::load_enclave_ex()");
     CLoader loader(base_addr, parser);
 
     ret = loader.load_enclave_ex(lc, debug, metadata, prd_css_file, misc_attr);
@@ -196,6 +198,7 @@ static int __create_enclave(BinParser &parser, uint8_t* base_addr, const metadat
         return ret;
     }
 
+    YPHPRINT("create CEnclave and ->CEnclave::initialize()");
     CEnclave* enclave = new CEnclave(loader);
     uint32_t enclave_version = SDK_VERSION_1_5;
     uint64_t urts_version = META_DATA_MAKE_VERSION(MAJOR_VERSION,MINOR_VERSION);
@@ -237,6 +240,7 @@ static int __create_enclave(BinParser &parser, uint8_t* base_addr, const metadat
 
     //add enclave to enclave pool before init_enclave because in simualtion
     //mode init_enclave will rely on CEnclavePool to get Enclave instance.
+    YPHPRINT("->->CEnclavePool::add_enclave() add enclave to enclave pool before init_enclave");
     if (FALSE == CEnclavePool::instance()->add_enclave(enclave))
     {
         loader.destroy_enclave();
@@ -244,13 +248,14 @@ static int __create_enclave(BinParser &parser, uint8_t* base_addr, const metadat
         return SGX_ERROR_UNEXPECTED;
     }
 
+    YPHPRINT("->CEnclave::add_thread() to add tcs");
     std::vector<std::pair<tcs_t *, bool>> tcs_list = loader.get_tcs_list();
     for (unsigned idx = 0; idx < tcs_list.size(); ++idx)
     {
         enclave->add_thread(tcs_list[idx].first, tcs_list[idx].second);
         SE_TRACE(SE_TRACE_DEBUG, "add tcs %p\n", tcs_list[idx].first);
     }
-    
+
     if(debug)
         debug_info->enclave_type |= ET_DEBUG;
     if (!(get_enclave_creator()->use_se_hw()))
@@ -329,6 +334,7 @@ static int __create_enclave(BinParser &parser, uint8_t* base_addr, const metadat
     }
 
     //call trts to do some intialization
+    YPHPRINT("->EnclaveCreatorHW::initialize() call trts to do some intialization");
     if(SGX_SUCCESS != (ret = get_enclave_creator()->initialize(loader.get_enclave_id())))
     {
         sgx_status_t status = SGX_SUCCESS;
@@ -339,7 +345,7 @@ static int __create_enclave(BinParser &parser, uint8_t* base_addr, const metadat
 
     if (get_enclave_creator()->is_EDMM_supported(loader.get_enclave_id()))
     {
-        
+
         layout_t *layout_start = GET_PTR(layout_t, metadata, metadata->dirs[DIR_LAYOUT].offset);
         layout_t *layout_end = GET_PTR(layout_t, metadata, metadata->dirs[DIR_LAYOUT].offset + metadata->dirs[DIR_LAYOUT].size);
         if (SGX_SUCCESS != (ret = loader.post_init_action_commit(layout_start, layout_end, 0)))
@@ -365,7 +371,8 @@ static int __create_enclave(BinParser &parser, uint8_t* base_addr, const metadat
             goto fail;
         }
     }
-        
+
+    YPHPRINT("->CLoader::set_memory_protection(true)");
     if(SGX_SUCCESS != (ret = loader.set_memory_protection(true)))
     {
         sgx_status_t status = SGX_SUCCESS;
@@ -403,10 +410,12 @@ sgx_status_t _create_enclave(const bool debug, se_file_handle_t pfile, se_file_t
         return (sgx_status_t)ret;
 #endif
 
+    YPHPRINT("->map_file()");
     mh = map_file(pfile, &file_size);
     if (!mh)
         return SGX_ERROR_OUT_OF_MEMORY;
 
+    YPHPRINT("create parser && invoke PARSER::run_parser()");
     PARSER parser(const_cast<uint8_t *>(mh->base_addr), (uint64_t)(file_size));
     if(SGX_SUCCESS != (ret = parser.run_parser()))
     {
@@ -420,6 +429,7 @@ sgx_status_t _create_enclave(const bool debug, se_file_handle_t pfile, se_file_t
         goto clean_return;
     }
 
+    YPHPRINT("->get_metadata()");
     if(SGX_SUCCESS != (ret = get_metadata(&parser, debug,  &metadata, &sgx_misc_attr)))
     {
         goto clean_return;
@@ -449,6 +459,7 @@ sgx_status_t _create_enclave(const bool debug, se_file_handle_t pfile, se_file_t
 
     //Need to set the whole misc_attr instead of just secs_attr.
     do {
+        YPHPRINT("->__create_enclave() on parser");
         ret = __create_enclave(parser, mh->base_addr, metadata, file, debug, lc, prd_css_file, enclave_id,
                                misc_attr);
         //SGX_ERROR_ENCLAVE_LOST caused by initializing enclave while power transition occurs
@@ -456,7 +467,7 @@ sgx_status_t _create_enclave(const bool debug, se_file_handle_t pfile, se_file_t
 
     if(SE_ERROR_INVALID_LAUNCH_TOKEN == ret)
         ret = SGX_ERROR_INVALID_LAUNCH_TOKEN;
-        
+
     // The launch token is updated, so the SE_INVALID_MEASUREMENT is only caused by signature.
     if(SE_ERROR_INVALID_MEASUREMENT == ret)
         ret = SGX_ERROR_INVALID_SIGNATURE;
@@ -475,6 +486,7 @@ sgx_status_t _create_enclave(const bool debug, se_file_handle_t pfile, se_file_t
 
 
 clean_return:
+    YPHPRINT("->unmap_file()");
     if(mh != NULL)
         unmap_file(mh);
     if(lc != NULL)

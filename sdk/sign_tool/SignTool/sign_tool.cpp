@@ -33,12 +33,12 @@
 // SignTool.cpp : Defines the entry point for the console application.
 //
 
-/** 
-* File: 
+/**
+* File:
 *     sign_tool.cpp
-*Description: 
+*Description:
 *     Defines the entry point for the application.
-* 
+*
 */
 
 #include <openssl/bio.h>
@@ -140,6 +140,7 @@ static bool measure_enclave(uint8_t *hash, const char *dllpath, const xml_parame
     uint64_t quota = 0;
     bin_fmt_t bin_fmt = BF_UNKNOWN;
 
+    YPHPRINT("->open_file() %s", dllpath);
     se_file_handle_t fh = open_file(dllpath);
     if (fh == THE_INVALID_HANDLE)
     {
@@ -167,6 +168,7 @@ static bool measure_enclave(uint8_t *hash, const char *dllpath, const xml_parame
     }
 
     // generate metadata
+    YPHPRINT("create CMetadata and CMetadata::build_metadata()%s", dllpath);
     CMetadata meta(metadata, parser.get());
     if(meta.build_metadata(parameter) == false)
     {
@@ -197,6 +199,7 @@ static bool measure_enclave(uint8_t *hash, const char *dllpath, const xml_parame
     }
 
     // Load enclave to get enclave hash
+    YPHPRINT("->load_enclave() Load enclave to get enclave hash%s", dllpath);
     int ret = load_enclave(parser.release(), metadata);
     close_handle(fh);
 
@@ -237,7 +240,7 @@ static bool measure_enclave(uint8_t *hash, const char *dllpath, const xml_parame
 //       fill the enclave_css_t structure with enclave_hash
 //       If the 'rsa' is not null, fill the key part
 //       If the path[UNSIGNED] != NULL, update the header.date(CATSIG mode)
-static bool fill_enclave_css(const RSA *rsa, const char **path, 
+static bool fill_enclave_css(const RSA *rsa, const char **path,
                              const uint8_t *enclave_hash, enclave_css_t *css)
 {
     assert(enclave_hash != NULL && path != NULL && css != NULL);
@@ -247,7 +250,7 @@ static bool fill_enclave_css(const RSA *rsa, const char **path,
     {
         int exponent_size = BN_num_bytes(rsa->e);
         int modulus_size = BN_num_bytes(rsa->n);
-        
+
         if(modulus_size > SE_KEY_SIZE)
             return false;
         unsigned char *modulus = (unsigned char *)malloc(SE_KEY_SIZE);
@@ -256,10 +259,10 @@ static bool fill_enclave_css(const RSA *rsa, const char **path,
             return false;
         }
         memset(modulus, 0, SE_KEY_SIZE);
-        
+
         exponent_size = (uint32_t)(ROUND_TO(exponent_size, sizeof(uint32_t)) / sizeof(uint32_t));
         modulus_size = (uint32_t)(ROUND_TO(modulus_size, sizeof(uint32_t)) / sizeof(uint32_t));
-        
+
         if(BN_bn2bin(rsa->n, modulus) != SE_KEY_SIZE)
         {
             free(modulus);
@@ -280,7 +283,7 @@ static bool fill_enclave_css(const RSA *rsa, const char **path,
         assert(modulus_size == 0x60);
     }
 
-    // fill the enclave hash 
+    // fill the enclave hash
     memcpy_s(&css->body.enclave_hash, sizeof(css->body.enclave_hash), enclave_hash, SGX_HASH_SIZE);
 
     if(path[UNSIGNED] != NULL)
@@ -312,11 +315,11 @@ static bool fill_enclave_css(const RSA *rsa, const char **path,
             se_trace(SE_TRACE_ERROR, UNSIGNED_FILE_XML_MISMATCH);
             return false;
         }
-    }   
+    }
     return true;
 }
 
-static bool calc_RSAq1q2(int length_s, const uint8_t *data_s, int length_m, const uint8_t *data_m, 
+static bool calc_RSAq1q2(int length_s, const uint8_t *data_s, int length_m, const uint8_t *data_m,
     uint8_t *data_q1, uint8_t *data_q2)
 {
     assert(data_s && data_m && data_q1 && data_q2);
@@ -324,7 +327,7 @@ static bool calc_RSAq1q2(int length_s, const uint8_t *data_s, int length_m, cons
     BIGNUM *ptemp1=NULL, *ptemp2=NULL, *pQ1=NULL, *pQ2=NULL, *pM=NULL, *pS = NULL;
     unsigned char *q1 = NULL, *q2= NULL;
     BN_CTX *ctx = NULL;
-    
+
     do{
         if((ptemp1 = BN_new()) == NULL)
             break;
@@ -338,18 +341,18 @@ static bool calc_RSAq1q2(int length_s, const uint8_t *data_s, int length_m, cons
             break;
         if((pS = BN_new()) == NULL)
             break;
-    
+
         if(BN_bin2bn((const unsigned char *)data_m, length_m, pM) == NULL)
             break;
         if(BN_bin2bn((const unsigned char *)data_s, length_s, pS) == NULL)
             break;
         if((ctx = BN_CTX_new()) == NULL)
             break;
-    
+
         //q1 = floor(signature*signature/modulus)
         //q2 = floor((signature*signature.signature - q1*signature*Modulus)/Modulus)
-        if(BN_mul(ptemp1, pS, pS, ctx) != 1) 
-            break; 
+        if(BN_mul(ptemp1, pS, pS, ctx) != 1)
+            break;
         if(BN_div(pQ1, ptemp2, ptemp1, pM, ctx) !=1)
             break;
         if(BN_mul(ptemp1, pS, ptemp2, ctx) !=1)
@@ -424,7 +427,7 @@ static bool create_signature(const RSA *rsa, const char *sigpath, enclave_css_t 
         }
     }
     else  //SIGN mode
-    {   
+    {
         size_t buffer_size = sizeof(enclave_css->header) + sizeof(enclave_css->body);
         uint8_t * temp_buffer = (uint8_t *)malloc(buffer_size * sizeof(char));
         if(NULL == temp_buffer)
@@ -461,11 +464,11 @@ static bool create_signature(const RSA *rsa, const char *sigpath, enclave_css_t 
     {
         modulus[i] = enclave_css->key.modulus[SE_KEY_SIZE-1-i];
     }
-    bool res = calc_RSAq1q2(sizeof(enclave_css->key.signature), 
-        (const uint8_t *)signature, 
-        sizeof(enclave_css->key.modulus), 
-        (const uint8_t *)modulus, 
-        (uint8_t *)enclave_css->buffer.q1, 
+    bool res = calc_RSAq1q2(sizeof(enclave_css->key.signature),
+        (const uint8_t *)signature,
+        sizeof(enclave_css->key.modulus),
+        (const uint8_t *)modulus,
+        (uint8_t *)enclave_css->buffer.q1,
         (uint8_t *)enclave_css->buffer.q2);
     return res;
 }
@@ -481,7 +484,7 @@ static bool verify_signature(const RSA *rsa, const enclave_css_t *enclave_css)
         return false;
     }
     memcpy_s(temp_buffer, buffer_size, &enclave_css->header, sizeof(enclave_css->header));
-    memcpy_s(temp_buffer + sizeof(enclave_css->header), buffer_size-sizeof(enclave_css->header), 
+    memcpy_s(temp_buffer + sizeof(enclave_css->header), buffer_size-sizeof(enclave_css->header),
         &enclave_css->body, sizeof(enclave_css->body));
 
     uint8_t hash[SGX_HASH_SIZE] = {0};
@@ -551,7 +554,7 @@ static bool cmdline_parse(unsigned int argc, char *argv[], int *mode, const char
     typedef struct _param_struct_{
         const char *name;          //options
         char *value;               //keep the path
-        int flag;                  //indicate this parameter is required(0), optional(1) or invalid(2) 
+        int flag;                  //indicate this parameter is required(0), optional(1) or invalid(2)
     }param_struct_t;               //keep the parameter pairs
 
     param_struct_t params_sign[] = {
@@ -614,7 +617,7 @@ static bool cmdline_parse(unsigned int argc, char *argv[], int *mode, const char
         if(!STRCMP(argv[err_idx], "-ignore-rel-error"))
             break;
     }
-    
+
     unsigned int params_count = (unsigned)(sizeof(params_sign)/sizeof(params_sign[0]));
     unsigned int params_count_min = 0;
     unsigned int params_count_max =0;
@@ -654,7 +657,7 @@ static bool cmdline_parse(unsigned int argc, char *argv[], int *mode, const char
                     params[tempmode][j].value = argv[i+1];
                     break;
                 }
-                else     //didn't match: 1) no path parameter behind option parameter 2) parameters format error. 
+                else     //didn't match: 1) no path parameter behind option parameter 2) parameters format error.
                 {
                     se_trace(SE_TRACE_ERROR, INVALID_FILE_NAME_ERROR, params[tempmode][j].name);
                     return false;
@@ -685,20 +688,20 @@ static bool cmdline_parse(unsigned int argc, char *argv[], int *mode, const char
     }
     *mode = tempmode;
     if(err_idx != argc)
-       *ignore_rel_error = true; 
+       *ignore_rel_error = true;
     return true;
 
 }
 
-//generate_output: 
+//generate_output:
 //    To generate the final output file
 //    SIGN-    need to fill the enclave_css_t(key part included), sign the header and body and
 //             update the metadata in the out file
-//    GENDATA- need to fill the enclave_css_t(key part excluded), get the body and header, 
+//    GENDATA- need to fill the enclave_css_t(key part excluded), get the body and header,
 //             and then write the whole out file with body+header+hash
-//    CATSIG-  need to fill the enclave_css_t(include key), read the signature from the sigpath, 
+//    CATSIG-  need to fill the enclave_css_t(include key), read the signature from the sigpath,
 //             and then update the metadata in the out file
-static bool generate_output(int mode, int ktype, const uint8_t *enclave_hash, const RSA *rsa, metadata_t *metadata, 
+static bool generate_output(int mode, int ktype, const uint8_t *enclave_hash, const RSA *rsa, metadata_t *metadata,
                             const char **path)
 {
     assert(enclave_hash != NULL && metadata != NULL && path != NULL);
@@ -750,7 +753,7 @@ static bool generate_output(int mode, int ktype, const uint8_t *enclave_hash, co
             }
 
             if(false == create_signature(NULL, path[SIG], &(metadata->enclave_css)))
-            {   
+            {
                 return false;
             }
             break;
@@ -923,17 +926,17 @@ static bool generate_compatible_metadata(metadata_t *metadata)
         else
         {
             tmp_layout.group.entry_count = (uint16_t)(((size_t)last - (size_t)first) / sizeof(layout_t) + 1);
-            tmp_layout.group.load_times = 1; 
+            tmp_layout.group.load_times = 1;
         }
 
-        for (uint32_t i = 0; i < tmp_layout.group.entry_count; i++) 
+        for (uint32_t i = 0; i < tmp_layout.group.entry_count; i++)
         {
             tmp_layout.group.load_step += (((uint64_t)first[i].entry.page_count) << SE_PAGE_SHIFT);
         }
         memcpy_s(first, sizeof(layout_t), &tmp_layout, sizeof(layout_t));
         size_to_reduce += (uint32_t)((size_t)last - (size_t)first);
     }
-    
+
     metadata_cleanup(metadata2, size_to_reduce);
     ret = append_compatible_metadata(metadata2, metadata);
     free(metadata2);
@@ -943,7 +946,7 @@ static bool generate_compatible_metadata(metadata_t *metadata)
 static bool dump_enclave_metadata(const char *enclave_path, const char *dumpfile_path)
 {
     assert(enclave_path != NULL && dumpfile_path != NULL);
-    
+
     uint64_t meta_offset = 0;
     bin_fmt_t bin_fmt = BF_UNKNOWN;
     uint32_t file_size = 0;
@@ -979,7 +982,7 @@ static bool dump_enclave_metadata(const char *enclave_path, const char *dumpfile
         close_handle(fh);
         return false;
     }
-    const metadata_t *metadata = GET_PTR(metadata_t, mh->base_addr, meta_offset); 
+    const metadata_t *metadata = GET_PTR(metadata_t, mh->base_addr, meta_offset);
     if(print_metadata(dumpfile_path, metadata) == false)
     {
         close_handle(fh);
@@ -1054,7 +1057,7 @@ int main(int argc, char* argv[])
             goto clear_return;
         }
     }
-    
+
     //Other modes
     //
     //Parse the xml file to get the metadata
@@ -1063,7 +1066,7 @@ int main(int argc, char* argv[])
         goto clear_return;
     }
     //Parse the key file
-    if(parse_key_file(mode, path[KEY], &rsa, &key_type) == false && key_type != NO_KEY) 
+    if(parse_key_file(mode, path[KEY], &rsa, &key_type) == false && key_type != NO_KEY)
     {
         goto clear_return;
     }
@@ -1104,7 +1107,7 @@ int main(int argc, char* argv[])
             goto clear_return;
         }
     }
-    
+
     if(path[DUMPFILE] != NULL)
     {
         if(print_metadata(path[DUMPFILE], metadata) == false)
@@ -1123,11 +1126,11 @@ clear_return:
         remove(path[OUTPUT]);
     if(res == -1 && path[DUMPFILE])
         remove(path[DUMPFILE]);
-    
+
     EVP_cleanup();
     CRYPTO_cleanup_all_ex_data();
     ERR_remove_thread_state(NULL);
     ERR_free_strings();
-    
+
     return res;
 }

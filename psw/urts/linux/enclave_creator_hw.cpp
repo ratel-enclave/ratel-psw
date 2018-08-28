@@ -29,7 +29,7 @@
  *
  */
 
-  
+
 #include "enclave.h"
 #include "enclave_creator_hw.h"
 #include "se_trace.h"
@@ -52,8 +52,10 @@
 #include <stdlib.h>
 
 #define POINTER_TO_U64(A) ((__u64)((uintptr_t)(A)))
-  
+
 #define SGX_CPUID   0x12
+
+#define ENCLAVE_START_ADDR NULL
 
 static EnclaveCreatorHW g_enclave_creator_hw;
 
@@ -113,10 +115,10 @@ int EnclaveCreatorHW::error_driver2urts(int driver_error)
          ret = SGX_ERROR_UNEXPECTED;
          break;
      }
- 
+
      return ret;
  }
- 
+
 int EnclaveCreatorHW::create_enclave(secs_t *secs, sgx_enclave_id_t *enclave_id, void **start_addr, bool ae)
 {
     assert(secs != NULL && enclave_id != NULL && start_addr != NULL);
@@ -130,7 +132,7 @@ int EnclaveCreatorHW::create_enclave(secs_t *secs, sgx_enclave_id_t *enclave_id,
 
     //SECS:BASEADDR must be naturally aligned on an SECS.SIZE boundary
     //This alignment is guaranteed by driver
-    void* enclave_base = mmap(NULL, (size_t)secs->size, PROT_NONE, MAP_SHARED, m_hdevice, 0);
+    void* enclave_base = mmap(ENCLAVE_START_ADDR, (size_t)secs->size, PROT_NONE, MAP_SHARED|MAP_FIXED, m_hdevice, 0);
     if(enclave_base == MAP_FAILED)
     {
         SE_TRACE(SE_TRACE_WARNING, "\ncreate enclave: mmap failed, errno = %d\n", errno);
@@ -138,11 +140,11 @@ int EnclaveCreatorHW::create_enclave(secs_t *secs, sgx_enclave_id_t *enclave_id,
     }
 
     secs->base = enclave_base;
-  
+
     struct sgx_enclave_create param = {0};
     param.src = POINTER_TO_U64(secs);
     int ret = ioctl(m_hdevice, SGX_IOC_ENCLAVE_CREATE, &param);
-    if(ret) 
+    if(ret)
     {
         SE_TRACE(SE_TRACE_WARNING, "\nSGX_IOC_ENCLAVE_CREATE failed: errno = %d\n", errno);
         return error_driver2urts(ret);
@@ -152,7 +154,7 @@ int EnclaveCreatorHW::create_enclave(secs_t *secs, sgx_enclave_id_t *enclave_id,
 
     return SGX_SUCCESS;
 }
- 
+
 int EnclaveCreatorHW::add_enclave_page(sgx_enclave_id_t enclave_id, void *src, uint64_t rva, const sec_info_t &sinfo, uint32_t attr)
 {
     assert((rva & ((1<<SE_PAGE_SHIFT)-1)) == 0);
@@ -180,11 +182,12 @@ int EnclaveCreatorHW::add_enclave_page(sgx_enclave_id_t enclave_id, void *src, u
 
     return SGX_SUCCESS;
 }
- 
+
 int EnclaveCreatorHW::try_init_enclave(sgx_enclave_id_t enclave_id, enclave_css_t *enclave_css, token_t *launch)
 {
     int ret = 0;
 
+    YPHPRINT("->ioctl() with parameter SGX_IOC_ENCLAVE_INIT or  SGX_IOC_ENCLAVE_INIT_IN_KERNEL");
     if (m_in_kernel_driver == false)
     {
         struct sgx_enclave_init initp = { 0, 0, 0 };
@@ -221,7 +224,7 @@ int EnclaveCreatorHW::try_init_enclave(sgx_enclave_id_t enclave_id, enclave_css_
 
     return SGX_SUCCESS;
 }
- 
+
 int EnclaveCreatorHW::destroy_enclave(sgx_enclave_id_t enclave_id, uint64_t enclave_size)
 {
     int ret = SGX_SUCCESS;
@@ -235,13 +238,13 @@ int EnclaveCreatorHW::destroy_enclave(sgx_enclave_id_t enclave_id, uint64_t encl
 
     return ret;
 }
- 
+
 bool EnclaveCreatorHW::get_plat_cap(sgx_misc_attribute_t *misc_attr)
 {
     // need to update code to support HyperV ECO
     return get_plat_cap_by_cpuid(misc_attr);
 }
- 
+
 bool EnclaveCreatorHW::open_se_device()
 {
     LockGuard lock(&m_dev_mutex);
@@ -267,7 +270,7 @@ bool EnclaveCreatorHW::open_se_device()
 
     return true;
 }
- 
+
 void EnclaveCreatorHW::close_se_device()
 {
     LockGuard lock(&m_dev_mutex);
@@ -296,7 +299,7 @@ int EnclaveCreatorHW::emodpr(uint64_t addr, uint64_t size, uint64_t flag)
 
     return SGX_SUCCESS;
 }
- 
+
 int EnclaveCreatorHW::mktcs(uint64_t tcs_addr)
 {
     sgx_range params;
@@ -313,7 +316,7 @@ int EnclaveCreatorHW::mktcs(uint64_t tcs_addr)
 
     return SGX_SUCCESS;
 }
- 
+
 int EnclaveCreatorHW::trim_range(uint64_t fromaddr, uint64_t toaddr)
 {
     sgx_range params;
@@ -331,7 +334,7 @@ int EnclaveCreatorHW::trim_range(uint64_t fromaddr, uint64_t toaddr)
     return SGX_SUCCESS;
 
 }
- 
+
 int EnclaveCreatorHW::trim_accept(uint64_t addr)
 {
     sgx_range params;
@@ -350,7 +353,7 @@ int EnclaveCreatorHW::trim_accept(uint64_t addr)
 
     return SGX_SUCCESS;
 }
- 
+
 int EnclaveCreatorHW::remove_range(uint64_t fromaddr, uint64_t numpages)
 {
     int ret = -1;
@@ -370,7 +373,7 @@ int EnclaveCreatorHW::remove_range(uint64_t fromaddr, uint64_t numpages)
 
     return SGX_SUCCESS;
 }
- 
+
 //EDMM is supported if and only if all of the following requirements are met:
 //1. We operate in HW mode
 //2. CPU has EDMM support

@@ -140,7 +140,7 @@ int CLoader::build_mem_region(const section_info_t &sec_info)
             assert(g_enclave_creator != NULL);
             if(g_enclave_creator->use_se_hw() == true)
             {
-                ret = mprotect((void*)(TRIM_TO_PAGE(rva) + (uint64_t)m_start_addr), SE_PAGE_SIZE, 
+                ret = mprotect((void*)(TRIM_TO_PAGE(rva) + (uint64_t)m_start_addr), SE_PAGE_SIZE,
                                (int)(sinfo.flags & SI_MASK_MEM_ATTRIBUTE));
                 if(ret != 0)
                 {
@@ -161,7 +161,7 @@ int CLoader::build_mem_region(const section_info_t &sec_info)
         // only the first time that rva may be not page aligned
         offset += SE_PAGE_SIZE - PAGE_OFFSET(rva);
     }
-    
+
     assert(IS_PAGE_ALIGNED(sec_info.rva + offset));
 
     // Add any remaining uninitialized data.  We can call build_pages directly
@@ -188,11 +188,9 @@ int CLoader::build_sections(vector<uint8_t> *bitmap)
     uint64_t max_rva =0;
     Section* last_section = NULL;
 
+    YPHPRINT("->build_pages() && build_mem_region()");
     for(unsigned int i = 0; i < sections.size() ; i++)
     {
-        
-        
-        
         if((META_DATA_MAKE_VERSION(SGX_1_5_MAJOR_VERSION,SGX_1_5_MINOR_VERSION ) == m_metadata->version) &&
             (last_section != NULL) &&
            (ROUND_TO_PAGE(last_section->virtual_size() + last_section->get_rva()) < ROUND_TO_PAGE(ROUND_TO_PAGE(last_section->virtual_size()) + last_section->get_rva())) &&
@@ -207,7 +205,7 @@ int CLoader::build_sections(vector<uint8_t> *bitmap)
                 return ret;
         }
 
-        if(sections[i]->get_rva() > max_rva) 
+        if(sections[i]->get_rva() > max_rva)
         {
             max_rva = sections[i]->get_rva();
             last_section = sections[i];
@@ -218,9 +216,9 @@ int CLoader::build_sections(vector<uint8_t> *bitmap)
         if(SGX_SUCCESS != (ret = build_mem_region(sec_info)))
             return ret;
     }
-    
-    
-    
+
+
+
     if((META_DATA_MAKE_VERSION(SGX_1_5_MAJOR_VERSION,SGX_1_5_MINOR_VERSION ) == m_metadata->version) &&
         (last_section != NULL) &&
        (ROUND_TO_PAGE(last_section->virtual_size() + last_section->get_rva()) < ROUND_TO_PAGE(ROUND_TO_PAGE(last_section->virtual_size()) + last_section->get_rva())))
@@ -306,7 +304,7 @@ int CLoader::post_init_action(layout_t *layout_start, layout_t *layout_end, uint
     }
     return SGX_SUCCESS;
 }
-  
+
 int CLoader::post_init_action_commit(layout_t *layout_start, layout_t *layout_end, uint64_t delta)
 {
     int ret = SGX_SUCCESS;
@@ -337,7 +335,7 @@ int CLoader::post_init_action_commit(layout_t *layout_start, layout_t *layout_en
     }
     return SGX_SUCCESS;
 }
-      
+
 int CLoader::build_context(const uint64_t start_rva, layout_entry_t *layout)
 {
     int ret = SGX_ERROR_UNEXPECTED;
@@ -349,7 +347,7 @@ int CLoader::build_context(const uint64_t start_rva, layout_entry_t *layout)
     //uint64_t start_addr = (uint64_t)get_start_addr();
 
 
-
+    YPHPRINT("->build_pages() && ->build_mem_region()");
     assert(IS_PAGE_ALIGNED(rva));
 
     if (layout->attributes & PAGE_ATTR_EADD)
@@ -363,6 +361,7 @@ int CLoader::build_context(const uint64_t start_rva, layout_entry_t *layout)
         {
             if(layout->si_flags == SI_FLAGS_TCS)
             {
+                YPHPRINT("->build_pages() to build tcs_t page");
                 memset(added_page, 0, SE_PAGE_SIZE);
                 memcpy_s(added_page, SE_PAGE_SIZE, GET_PTR(uint8_t, m_metadata, layout->content_offset), layout->content_size);
 
@@ -380,9 +379,9 @@ int CLoader::build_context(const uint64_t start_rva, layout_entry_t *layout)
                     return ret;
                 }
             }
-            else // guard page should not have content_offset != 0 
-            {   
-                           
+            else // guard page should not have content_offset != 0
+            {
+
                 section_info_t sec_info = {GET_PTR(uint8_t, m_metadata, layout->content_offset), layout->content_size, rva, ((uint64_t)layout->page_count) << SE_PAGE_SHIFT, layout->si_flags, NULL};
                 if(SGX_SUCCESS != (ret = build_mem_region(sec_info)))
                 {
@@ -393,7 +392,7 @@ int CLoader::build_context(const uint64_t start_rva, layout_entry_t *layout)
         else if (layout->si_flags != SI_FLAG_NONE)
         {
             sinfo.flags = layout->si_flags;
-           
+
             void *source = NULL;
             if(layout->content_size)
             {
@@ -403,7 +402,7 @@ int CLoader::build_context(const uint64_t start_rva, layout_entry_t *layout)
                 }
                 source = added_page;
             }
-            
+
             if(SGX_SUCCESS != (ret = build_pages(rva, ((uint64_t)layout->page_count) << SE_PAGE_SHIFT, source, sinfo, layout->attributes)))
             {
                 return ret;
@@ -423,8 +422,11 @@ int CLoader::build_context(const uint64_t start_rva, layout_entry_t *layout)
     }
     return SGX_SUCCESS;
 }
+
+
 int CLoader::build_contexts(layout_t *layout_start, layout_t *layout_end, uint64_t delta)
 {
+    YPHPRINT("->build_context() && ->build_contexts()");
     int ret = SGX_ERROR_UNEXPECTED;
     for(layout_t *layout = layout_start; layout < layout_end; layout++)
     {
@@ -464,12 +466,14 @@ int CLoader::build_secs(sgx_attributes_t * const secs_attr, sgx_misc_attribute_t
     EnclaveCreator *enclave_creator = get_enclave_creator();
     if(NULL == enclave_creator)
         return SGX_ERROR_UNEXPECTED;
+    YPHPRINT("->EnclaveCreatorHW::create_enclave() @%p:0x%lx", m_start_addr, m_metadata->enclave_size);
     int ret = enclave_creator->create_enclave(&m_secs, &m_enclave_id, &m_start_addr, is_ae(&m_metadata->enclave_css));
     if(SGX_SUCCESS == ret)
     {
         SE_TRACE(SE_TRACE_NOTICE, "enclave start address = %p, size = 0x%llx\n", m_start_addr, m_metadata->enclave_size);
         if(enclave_creator->use_se_hw() == true)
         {
+            YPHPRINT("->CLoader::set_memory_protection(false)");
             set_memory_protection(false);
         }
     }
@@ -479,7 +483,7 @@ int CLoader::build_image(SGXLaunchToken * const lc, sgx_attributes_t * const sec
 {
     int ret = SGX_SUCCESS;
 
-
+    YPHPRINT("->CLoader::build_secs()");
     if(SGX_SUCCESS != (ret = build_secs(secs_attr, misc_attr)))
     {
         SE_TRACE(SE_TRACE_WARNING, "build secs failed\n");
@@ -502,6 +506,7 @@ int CLoader::build_image(SGXLaunchToken * const lc, sgx_attributes_t * const sec
         memcpy_s(GET_PTR(void, m_parser.get_start_addr(), patch->dst), patch->size, GET_PTR(void, m_metadata, patch->src), patch->size);
     }
 
+    YPHPRINT("->CLoader::build_sections()");
     //build sections, copy export function table as well;
     if(SGX_SUCCESS != (ret = build_sections(&bitmap)))
     {
@@ -509,8 +514,9 @@ int CLoader::build_image(SGXLaunchToken * const lc, sgx_attributes_t * const sec
         goto fail;
     }
 
+    YPHPRINT("->CLoader::build_contexts() build heap/thread context");
     // build heap/thread context
-    if (SGX_SUCCESS != (ret = build_contexts(GET_PTR(layout_t, m_metadata, m_metadata->dirs[DIR_LAYOUT].offset), 
+    if (SGX_SUCCESS != (ret = build_contexts(GET_PTR(layout_t, m_metadata, m_metadata->dirs[DIR_LAYOUT].offset),
                                       GET_PTR(layout_t, m_metadata, m_metadata->dirs[DIR_LAYOUT].offset + m_metadata->dirs[DIR_LAYOUT].size),
                                       0)))
     {
@@ -519,6 +525,7 @@ int CLoader::build_image(SGXLaunchToken * const lc, sgx_attributes_t * const sec
     }
 
     //initialize Enclave
+    YPHPRINT("->EnclaveCreatorHW::init_enclave() build heap/thread context");
     ret = get_enclave_creator()->init_enclave(ENCLAVE_ID_IOCTL, const_cast<enclave_css_t *>(&m_metadata->enclave_css), lc, prd_css_file);
     if(SGX_SUCCESS != ret)
     {
@@ -534,6 +541,8 @@ fail:
 
     return ret;
 }
+
+
 bool CLoader::is_metadata_buffer(uint32_t offset, uint32_t size)
 {
     if((offsetof(metadata_t, data) > offset) || (offset >= m_metadata->size))
@@ -730,6 +739,7 @@ int CLoader::load_enclave(SGXLaunchToken *lc, int debug, const metadata_t *metad
         return ret;
     }
 
+    YPHPRINT("->CLoader::build_image()");
     ret = build_image(lc, &sgx_misc_attr.secs_attr, prd_css_file, &sgx_misc_attr);
     // Update misc_attr with secs.attr upon success.
     if(SGX_SUCCESS == ret)
@@ -752,6 +762,7 @@ int CLoader::load_enclave_ex(SGXLaunchToken *lc, bool debug, const metadata_t *m
 
     while (retry)
     {
+        YPHPRINT("->CLoader::load_enclave()");
         ret = this->load_enclave(lc, debug, metadata, prd_css_file, misc_attr);
         switch(ret)
         {
@@ -814,8 +825,8 @@ int CLoader::set_memory_protection(bool is_after_initialization)
     if (SGX_SUCCESS != ret)
     {
         return ret;
-    } 
-    
+    }
+
     return SGX_SUCCESS;
 
 }
@@ -837,7 +848,7 @@ int CLoader::set_context_protection(layout_t *layout_start, layout_t *layout_end
                 prot = SI_FLAGS_RW & SI_MASK_MEM_ATTRIBUTE;
 #ifndef SE_SIM
 
-                //when a page is eremoved when loading, we should set this page to none access. 
+                //when a page is eremoved when loading, we should set this page to none access.
                 //if this page is accessed, a sigbus exception will be raised.
                 uint16_t attributes = layout->entry.attributes;
                 if(attributes & PAGE_ATTR_EADD && attributes & PAGE_ATTR_EREMOVE)
@@ -847,17 +858,17 @@ int CLoader::set_context_protection(layout_t *layout_start, layout_t *layout_end
                         prot = SI_FLAG_NONE & SI_MASK_MEM_ATTRIBUTE;
                     }
                 }
-#endif                          
+#endif
             }
 
-            ret = mprotect(GET_PTR(void, m_start_addr, layout->entry.rva + delta), 
+            ret = mprotect(GET_PTR(void, m_start_addr, layout->entry.rva + delta),
                                (size_t)layout->entry.page_count << SE_PAGE_SHIFT,
-                               prot); 
+                               prot);
             if(ret != 0)
             {
                 SE_TRACE(SE_TRACE_WARNING, "mprotect(rva=%" PRIu64 ", len=%" PRIu64 ", flags=%d) failed\n",
-                         (uint64_t)m_start_addr + layout->entry.rva + delta, 
-                         (uint64_t)layout->entry.page_count << SE_PAGE_SHIFT, 
+                         (uint64_t)m_start_addr + layout->entry.rva + delta,
+                         (uint64_t)layout->entry.page_count << SE_PAGE_SHIFT,
                           prot);
                 return SGX_ERROR_UNEXPECTED;
             }

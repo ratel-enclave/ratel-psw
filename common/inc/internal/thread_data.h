@@ -125,15 +125,11 @@ extern "C" {
 thread_data_t *get_thread_data(void);
 
 #if defined(LINUX64)
+
 void init_slave_thread_data(thread_data_t *td);
 void load_fsbase(sys_word_t base);
 void load_gsbase(sys_word_t base);
 
-#else
-
-#define init_slave_thread_data(x)
-#define update_fsbase(x)
-#define update_gsbase(x)
 
 #endif
 

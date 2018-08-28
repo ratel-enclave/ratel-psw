@@ -292,7 +292,8 @@ static void _init_master_thread_data(void* tcs, thread_data_t *td)
     td->gsbase = td;
 }
 
-extern "C" void init_slave_thread_data(thread_data_t *td)
+
+extern "C" void init_slave_thread_data(thread_data_t* td)
 {
     thread_data_t *td_cur = get_thread_data();
     assert(td != NULL && td_cur != NULL);
@@ -300,6 +301,7 @@ extern "C" void init_slave_thread_data(thread_data_t *td)
     td->self_addr = (sys_word_t)td;
     td->master_tls_segment = 0; /* false */
 }
+
 
 sgx_status_t do_init_thread(void *tcs)
 {

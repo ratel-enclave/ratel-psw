@@ -397,7 +397,7 @@ bool get_meta_property(const uint8_t *start_addr, const ElfW(Ehdr) *elf_hdr, uin
         se_trace(SE_TRACE_ERROR, "ERROR: The '.note.sgxmeta' section size is not correct.\n");
         return false;
     }
-    
+
     const char * meta_name = "sgx_metadata";
     if (note->namesz != (strlen(meta_name)+1) || memcmp(GET_PTR(void, start_addr, shdr->sh_offset + sizeof(ElfW(Note))), meta_name, note->namesz))
     {
@@ -916,6 +916,7 @@ bool ElfParser::set_memory_protection(uint64_t enclave_base_addr, bool is_after_
         }
         rva = TRIM_TO_PAGE(sections[i]->get_rva()) + enclave_base_addr;
         prot = (int)(sections[i]->get_si_flags()&SI_MASK_MEM_ATTRIBUTE);
+        YPHPRINT("rva:%lx->size:%ld", rva, len);
         ret = mprotect((void*)rva, (size_t)len, prot);
         if(ret != 0)
         {
@@ -925,6 +926,7 @@ bool ElfParser::set_memory_protection(uint64_t enclave_base_addr, bool is_after_
         if(last_section_end != 0)
         {
             prot = (int)(SI_FLAG_NONE & SI_MASK_MEM_ATTRIBUTE);
+            YPHPRINT(" rva:%lx->size:%ld", last_section_end, (size_t)(rva - last_section_end));
             ret = mprotect((void*)last_section_end, (size_t)(rva - last_section_end), prot);
             if(ret != 0)
             {
@@ -933,26 +935,27 @@ bool ElfParser::set_memory_protection(uint64_t enclave_base_addr, bool is_after_
         }
         last_section_end = rva + len;
     }
-    
-  
+
+
     if(is_after_initialization == false)
     {
         return true;
     }
-    
+
     const ElfW(Ehdr) *elf_hdr = (const ElfW(Ehdr) *)m_start_addr;
     const ElfW(Phdr) *prg_hdr = GET_PTR(ElfW(Phdr), elf_hdr, elf_hdr->e_phoff);
 
     for (int idx = 0; idx < elf_hdr->e_phnum; idx++, prg_hdr++)
     {
        if(prg_hdr->p_type == PT_DYNAMIC ||
-          prg_hdr->p_type == PT_GNU_EH_FRAME || 
+          prg_hdr->p_type == PT_GNU_EH_FRAME ||
           prg_hdr->p_type == PT_GNU_RELRO)
        {
            rva = TRIM_TO_PAGE(enclave_base_addr + prg_hdr->p_vaddr);
            rva_end = ROUND_TO(enclave_base_addr + prg_hdr->p_vaddr + prg_hdr->p_memsz, prg_hdr->p_align);
            len = rva_end - rva;
            prot = (int)(page_attr_to_si_flags(prg_hdr->p_flags) & SI_MASK_MEM_ATTRIBUTE);
+           YPHPRINT("rva:%lx->size:%ld", rva, len);
            ret = mprotect((void*)rva, (size_t)len, prot);
            if(ret != 0)
            {

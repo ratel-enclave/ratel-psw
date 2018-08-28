@@ -46,6 +46,7 @@ extern "C" sgx_status_t sgx_create_enclave(const char *file_name, const int debu
     if(TRUE != debug &&  FALSE != debug)
         return SGX_ERROR_INVALID_PARAMETER;
 
+    YPHPRINT("open file %s", file_name);
     int fd = open(file_name, O_RDONLY);
     if(-1 == fd)
     {
@@ -57,6 +58,7 @@ extern "C" sgx_status_t sgx_create_enclave(const char *file_name, const int debu
     file.name = realpath(file_name, resolved_path);
     file.name_len = (uint32_t)strlen(resolved_path);
 
+    YPHPRINT("->_create_enclave()");
     ret = _create_enclave(!!debug, fd, file, NULL, launch_token, launch_token_updated, enclave_id, misc_attr);
     if(SGX_SUCCESS != ret && misc_attr)
     {
@@ -66,6 +68,7 @@ extern "C" sgx_status_t sgx_create_enclave(const char *file_name, const int debu
         memcpy_s(misc_attr, sizeof(sgx_misc_attribute_t), &plat_cap, sizeof(sgx_misc_attribute_t));
     }
 
+    YPHPRINT("close file %s", file_name);
     close(fd);
 
     return ret;

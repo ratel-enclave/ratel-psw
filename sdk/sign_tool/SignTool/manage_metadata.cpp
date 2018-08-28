@@ -192,19 +192,23 @@ bool CMetadata::build_metadata(const xml_parameter_t *parameter)
         return false;
     }
     // layout table
+    YPHPRINT("->build_layout_table()");
     if(!build_layout_table())
     {
         return false;
     }
     // patch table
+    YPHPRINT("->build_patch_table()");
     if(!build_patch_table())
     {
         return false;
     }
+    YPHPRINT("->build_layout_entries()");
     if(!build_layout_entries())
     {
         return false;
     }
+    YPHPRINT("->build_gd_template()");
     if(!build_gd_template(m_gd_template, &m_gd_size))
     {
         return false;
@@ -246,7 +250,7 @@ bool CMetadata::fill_enclave_css(const xml_parameter_t *para)
     memcpy_s(&m_metadata->enclave_css.header.header, sizeof(m_metadata->enclave_css.header.header), &header, sizeof(header));
     memcpy_s(&m_metadata->enclave_css.header.header2, sizeof(m_metadata->enclave_css.header.header2), &header2, sizeof(header2));
 
-    // For 'type', signing tool clears the bit 31 for product enclaves 
+    // For 'type', signing tool clears the bit 31 for product enclaves
     // and set the bit 31 for debug enclaves
     m_metadata->enclave_css.header.type = (para[RELEASETYPE].value & 0x01) ? (1<<31) : 0;
     m_metadata->enclave_css.header.module_vendor = (para[INTELSIGNED].value&0x01) ? 0x8086 : 0;
@@ -429,11 +433,12 @@ void *CMetadata::alloc_buffer_from_metadata(uint32_t size)
 }
 
 /*
-* Called within build_layout_table(), used to assign the rva to entry layout  
+* Called within build_layout_table(), used to assign the rva to entry layout
 * and load_step to group layout.
 */
 bool CMetadata::update_layout_entries()
 {
+    YPHPRINT("assign the rva to entry layout");
     m_rva = calculate_sections_size();
     if(m_rva == 0)
     {
@@ -445,6 +450,7 @@ bool CMetadata::update_layout_entries()
     {
         if(!IS_GROUP_ID(m_layouts[i].entry.id))
         {
+            YPHPRINT("m_layouts[%d] rva = 0x%lx, npg = %d", i, m_rva, m_layouts[i].entry.page_count);
             m_layouts[i].entry.rva = m_rva;
             m_rva += (((uint64_t)m_layouts[i].entry.page_count) << SE_PAGE_SHIFT);
         }
@@ -467,13 +473,13 @@ bool CMetadata::build_layout_entries()
     layout_t *layout_table = (layout_t *) alloc_buffer_from_metadata(size);
     if(layout_table == NULL)
     {
-        se_trace(SE_TRACE_ERROR, INVALID_ENCLAVE_ERROR); 
+        se_trace(SE_TRACE_ERROR, INVALID_ENCLAVE_ERROR);
         return false;
     }
     m_metadata->dirs[DIR_LAYOUT].offset = (uint32_t)PTR_DIFF(layout_table, m_metadata);
     m_metadata->dirs[DIR_LAYOUT].size = size;
 
-  
+
     for(uint32_t i = 0; i < m_layouts.size(); i++, layout_table++)
     {
         memcpy_s(layout_table, sizeof(layout_t), &m_layouts[i], sizeof(layout_t));
@@ -482,7 +488,7 @@ bool CMetadata::build_layout_entries()
     m_metadata->enclave_size = calculate_enclave_size(m_rva);
     if(m_metadata->enclave_size == (uint64_t)-1)
     {
-        se_trace(SE_TRACE_ERROR, OUT_OF_EPC_ERROR); 
+        se_trace(SE_TRACE_ERROR, OUT_OF_EPC_ERROR);
         return false;
     }
     // the last guard page entry to round the enclave size to power of 2
@@ -491,7 +497,7 @@ bool CMetadata::build_layout_entries()
         layout_table = (layout_t *)alloc_buffer_from_metadata(sizeof(layout_t));
         if(layout_table == NULL)
         {
-            se_trace(SE_TRACE_ERROR, INVALID_ENCLAVE_ERROR); 
+            se_trace(SE_TRACE_ERROR, INVALID_ENCLAVE_ERROR);
             return false;
         }
         layout_table->entry.id = LAYOUT_ID_GUARD;
@@ -511,7 +517,7 @@ bool CMetadata::build_layout_table()
     memset(&guard_page, 0, sizeof(guard_page));
     guard_page.entry.id = LAYOUT_ID_GUARD;
     guard_page.entry.page_count = SE_GUARD_PAGE_SIZE >> SE_PAGE_SHIFT;
-    
+
     size_t thread_start;
     size_t thread_end;
     // heap
@@ -520,7 +526,7 @@ bool CMetadata::build_layout_table()
     layout.entry.attributes = PAGE_ATTR_EADD;
     layout.entry.si_flags = SI_FLAGS_RW;
     m_layouts.push_back(layout);
-
+    YPHPRINT("build LAYOUT_ID_HEAP_MIN: npg = %d", layout.entry.page_count);
     if(m_create_param.heap_init_size > m_create_param.heap_min_size)
     {
         layout.entry.id = LAYOUT_ID_HEAP_INIT;
@@ -528,6 +534,7 @@ bool CMetadata::build_layout_table()
         layout.entry.attributes = PAGE_ATTR_EADD | PAGE_ATTR_POST_REMOVE | PAGE_ATTR_POST_ADD;
         layout.entry.si_flags = SI_FLAGS_RW;
         m_layouts.push_back(layout);
+        YPHPRINT("build LAYOUT_ID_HEAP_INIT: npg = %d", layout.entry.page_count);
     }
 
     if(m_create_param.heap_max_size > m_create_param.heap_init_size)
@@ -537,6 +544,7 @@ bool CMetadata::build_layout_table()
         layout.entry.attributes = PAGE_ATTR_POST_ADD;
         layout.entry.si_flags = SI_FLAGS_RW;
         m_layouts.push_back(layout);
+        YPHPRINT("build LAYOUT_ID_HEAP_INIT: npg = %d", layout.entry.page_count);
     }
 
 
@@ -546,6 +554,7 @@ bool CMetadata::build_layout_table()
     //ulitity tcs
     // guard page
     m_layouts.push_back(guard_page);
+    YPHPRINT("add  guard_page: npg = %d", guard_page.entry.page_count);
 
     // stack
     if(m_create_param.stack_max_size > m_create_param.stack_min_size)
@@ -556,6 +565,7 @@ bool CMetadata::build_layout_table()
         layout.entry.si_flags = SI_FLAGS_RW;
         layout.entry.content_size = 0xCCCCCCCC;
         m_layouts.push_back(layout);
+        YPHPRINT("build LAYOUT_ID_STACK_MAX: npg = %d", layout.entry.page_count);
     }
     layout.entry.id = LAYOUT_ID_STACK_MIN;
     layout.entry.page_count = (uint32_t)(m_create_param.stack_min_size >> SE_PAGE_SHIFT);
@@ -563,9 +573,10 @@ bool CMetadata::build_layout_table()
     layout.entry.si_flags = SI_FLAGS_RW;
     layout.entry.content_size = 0xCCCCCCCC;
     m_layouts.push_back(layout);
-
+    YPHPRINT("build LAYOUT_ID_STACK_MIN: npg = %d", layout.entry.page_count);
     // guard page
     m_layouts.push_back(guard_page);
+    YPHPRINT("add  guard_page: npg = %d", guard_page.entry.page_count);
 
     // tcs
     layout.entry.id = LAYOUT_ID_TCS;
@@ -575,23 +586,27 @@ bool CMetadata::build_layout_table()
     tcs_t *tcs_template = (tcs_t *) alloc_buffer_from_metadata(TCS_TEMPLATE_SIZE);
     if(tcs_template == NULL)
     {
-        se_trace(SE_TRACE_ERROR, INVALID_ENCLAVE_ERROR); 
+        se_trace(SE_TRACE_ERROR, INVALID_ENCLAVE_ERROR);
         return false;
     }
-    layout.entry.content_offset = (uint32_t)PTR_DIFF(tcs_template, m_metadata), 
+    layout.entry.content_offset = (uint32_t)PTR_DIFF(tcs_template, m_metadata),
     layout.entry.content_size = TCS_TEMPLATE_SIZE;
     m_layouts.push_back(layout);
+    YPHPRINT("build LAYOUT_ID_TCS: npg = %d", layout.entry.page_count);
+
     memset(&layout, 0, sizeof(layout));
 
-    // ssa 
+    // ssa
     layout.entry.id = LAYOUT_ID_SSA;
     layout.entry.page_count = SSA_FRAME_SIZE * SSA_NUM;
     layout.entry.attributes = PAGE_ATTR_EADD | PAGE_ATTR_EEXTEND;
     layout.entry.si_flags = SI_FLAGS_RW;
     m_layouts.push_back(layout);
+    YPHPRINT("build LAYOUT_ID_SSA: npg = %d", layout.entry.page_count);
 
     // guard page
     m_layouts.push_back(guard_page);
+    YPHPRINT("add  guard_page: npg = %d", guard_page.entry.page_count);
 
     // td
     layout.entry.id = LAYOUT_ID_TD;
@@ -604,9 +619,10 @@ bool CMetadata::build_layout_table()
     layout.entry.attributes = PAGE_ATTR_EADD | PAGE_ATTR_EEXTEND;
     layout.entry.si_flags = SI_FLAGS_RW;
     m_layouts.push_back(layout);
+    YPHPRINT("build LAYOUT_ID_TD: npg = %d", layout.entry.page_count);
 
     thread_end = m_layouts.size();
-    
+
     uint32_t tcs_min_pool = 0;
     uint32_t tcs_eremove = 0;
     if(m_create_param.tcs_min_pool > m_create_param.tcs_num - 1)
@@ -629,19 +645,22 @@ bool CMetadata::build_layout_table()
         layout.group.entry_count = (uint16_t)(thread_end - thread_start);
         layout.group.load_times = tcs_min_pool;
         m_layouts.push_back(layout);
+        YPHPRINT("create group for static thread contexts");
     }
-    
+
     //tcs will be eremoved
     if (tcs_eremove > 0)
     {
+        YPHPRINT("tcs will be eremoved");
         for(size_t i = thread_start; i < thread_end; i++)
-        {            
+        {
             layout = m_layouts[i];
             if(layout.entry.id != LAYOUT_ID_GUARD)
             {
                 layout.entry.attributes |= PAGE_ATTR_EREMOVE;
             }
             m_layouts.push_back(layout);
+            YPHPRINT("static thread contexts with PAGE_ATTR_EREMOVE attr");
         }
 
         if (tcs_eremove > 1)
@@ -653,9 +672,10 @@ bool CMetadata::build_layout_table()
             m_layouts.push_back(layout);
         }
     }
-    // dynamic thread contexts 
+    // dynamic thread contexts
     if (m_create_param.tcs_max_num > tcs_min_pool + 1)
     {
+        YPHPRINT("dynamic thread contexts");
         for(size_t i = thread_start; i < thread_end; i++)
         {
             layout = m_layouts[i];
@@ -670,6 +690,7 @@ bool CMetadata::build_layout_table()
                 layout.entry.attributes = PAGE_ATTR_POST_ADD | PAGE_ATTR_DYN_THREAD;
             }
             m_layouts.push_back(layout);
+            YPHPRINT("static thread contexts with PAGE_ATTR_POST_ADD attr");
         }
         // dynamic thread group
         if (m_create_param.tcs_max_num > m_create_param.tcs_min_pool)
@@ -683,15 +704,17 @@ bool CMetadata::build_layout_table()
     }
 
     // update layout entries
+    YPHPRINT("->update_layout_entries()");
     if(false == update_layout_entries())
     {
         return false;
     }
 
     // tcs template
+    YPHPRINT("->build_tcs_template()");
     if(false == build_tcs_template(tcs_template))
     {
-        se_trace(SE_TRACE_ERROR, INVALID_ENCLAVE_ERROR); 
+        se_trace(SE_TRACE_ERROR, INVALID_ENCLAVE_ERROR);
         return false;
     }
     return true;
@@ -702,7 +725,7 @@ bool CMetadata::build_patch_entries(vector<patch_entry_t> &patches)
     patch_entry_t *patch_table = (patch_entry_t *) alloc_buffer_from_metadata(size);
     if(patch_table == NULL)
     {
-        se_trace(SE_TRACE_ERROR, INVALID_ENCLAVE_ERROR); 
+        se_trace(SE_TRACE_ERROR, INVALID_ENCLAVE_ERROR);
         return false;
     }
     m_metadata->dirs[DIR_PATCH].offset = (uint32_t)PTR_DIFF(patch_table, m_metadata);
@@ -733,7 +756,7 @@ bool CMetadata::build_patch_table()
     uint64_t rva = m_parser->get_symbol_rva("g_global_data");
     if(0 == rva)
     {
-        se_trace(SE_TRACE_ERROR, INVALID_ENCLAVE_ERROR); 
+        se_trace(SE_TRACE_ERROR, INVALID_ENCLAVE_ERROR);
          return false;
     }
 
@@ -746,7 +769,7 @@ bool CMetadata::build_patch_table()
     uint64_t *zero = (uint64_t *)alloc_buffer_from_metadata(sizeof(*zero));
     if(zero == NULL)
     {
-        se_trace(SE_TRACE_ERROR, INVALID_ENCLAVE_ERROR); 
+        se_trace(SE_TRACE_ERROR, INVALID_ENCLAVE_ERROR);
         return false;
     }
     *zero = 0;
@@ -768,7 +791,7 @@ bool CMetadata::build_patch_table()
         patch.src = (uint32_t)PTR_DIFF(zero, m_metadata);
         patch.size = (uint32_t)sizeof(elf_hdr->e_shstrndx);
         patches.push_back(patch);
- 
+
         // Modify GNU_RELRO info to eliminate the impact of enclave measurement.
         Elf32_Phdr *prg_hdr = GET_PTR(Elf32_Phdr, base_addr, elf_hdr->e_phoff);
         for (unsigned idx = 0; idx < elf_hdr->e_phnum; ++idx, ++prg_hdr)
@@ -804,7 +827,7 @@ bool CMetadata::build_patch_table()
     }
     if(false == build_patch_entries(patches))
     {
-        se_trace(SE_TRACE_ERROR, NO_MEMORY_ERROR); 
+        se_trace(SE_TRACE_ERROR, NO_MEMORY_ERROR);
         return false;
     }
     return true;
@@ -937,7 +960,7 @@ uint64_t CMetadata::calculate_sections_size()
     }
 
     uint64_t size = (NULL == last_section) ? (0) : (last_section->get_rva() + last_section->virtual_size());
-    size = ROUND_TO_PAGE(size); 
+    size = ROUND_TO_PAGE(size);
 
     return size;
 }
@@ -956,7 +979,7 @@ uint64_t CMetadata::calculate_enclave_size(uint64_t size)
         if(!round_size)
             return (uint64_t)-1;
     }
-    
+
     if(round_size > enclave_max_size)
         return (uint64_t)-1;
 
@@ -967,7 +990,7 @@ bool update_metadata(const char *path, const metadata_t *metadata, uint64_t meta
 {
     assert(path != NULL && metadata != NULL);
 
-    return write_data_to_file(path, std::ios::in | std::ios::binary| std::ios::out, 
+    return write_data_to_file(path, std::ios::in | std::ios::binary| std::ios::out,
         reinterpret_cast<uint8_t *>(const_cast<metadata_t *>( metadata)), METADATA_SIZE, (long)meta_offset);
 }
 
@@ -1001,7 +1024,7 @@ bool print_metadata(const char *path, const metadata_t *metadata)
         se_trace(SE_TRACE_ERROR, OPEN_FILE_ERROR, path);
         return false;
     }
-    
+
     meta_ofs << "The metadata information:" << std::endl
 	<< "=========================" << std::endl;
     PRINT_ELEMENT(meta_ofs, metadata, magic_num);
@@ -1027,7 +1050,7 @@ bool print_metadata(const char *path, const metadata_t *metadata)
     PRINT_ARRAY(meta_ofs, metadata, enclave_css.key.modulus, SE_KEY_SIZE);
     PRINT_ARRAY(meta_ofs, metadata, enclave_css.key.exponent, SE_EXPONENT_SIZE);
     PRINT_ARRAY(meta_ofs, metadata, enclave_css.key.signature, SE_KEY_SIZE);
-    
+
     // css.body
     PRINT_ELEMENT(meta_ofs, metadata, enclave_css.body.misc_select);
     PRINT_ELEMENT(meta_ofs, metadata, enclave_css.body.misc_mask);
@@ -1040,7 +1063,7 @@ bool print_metadata(const char *path, const metadata_t *metadata)
     PRINT_ELEMENT(meta_ofs, metadata, enclave_css.body.isv_svn);
 
     // css.buffer
-    PRINT_ARRAY(meta_ofs, metadata, enclave_css.buffer.q1, SE_KEY_SIZE); 
+    PRINT_ARRAY(meta_ofs, metadata, enclave_css.buffer.q1, SE_KEY_SIZE);
     PRINT_ARRAY(meta_ofs, metadata, enclave_css.buffer.q2, SE_KEY_SIZE);
 
     metadata_t *metadata2 = GET_PTR(metadata_t, metadata, metadata->size);
@@ -1061,7 +1084,7 @@ bool print_metadata(const char *path, const metadata_t *metadata)
         PRINT_ELEMENT(meta_ofs, metadata2, enclave_size);
         PRINT_ELEMENT(meta_ofs, metadata2, attributes.flags);
         PRINT_ELEMENT(meta_ofs, metadata2, attributes.xfrm);
-    
+
         // css.header
         PRINT_ARRAY(meta_ofs, metadata2, enclave_css.header.header, 12);
         PRINT_ELEMENT(meta_ofs, metadata2, enclave_css.header.type);
@@ -1069,12 +1092,12 @@ bool print_metadata(const char *path, const metadata_t *metadata)
         PRINT_ELEMENT(meta_ofs, metadata2, enclave_css.header.date);
         PRINT_ARRAY(meta_ofs, metadata2, enclave_css.header.header2, 16);
         PRINT_ELEMENT(meta_ofs, metadata2, enclave_css.header.hw_version);
-    
+
         // css.key
         PRINT_ARRAY(meta_ofs, metadata2, enclave_css.key.modulus, SE_KEY_SIZE);
         PRINT_ARRAY(meta_ofs, metadata2, enclave_css.key.exponent, SE_EXPONENT_SIZE);
         PRINT_ARRAY(meta_ofs, metadata2, enclave_css.key.signature, SE_KEY_SIZE);
-        
+
         // css.body
         PRINT_ELEMENT(meta_ofs, metadata2, enclave_css.body.misc_select);
         PRINT_ELEMENT(meta_ofs, metadata2, enclave_css.body.misc_mask);
@@ -1085,9 +1108,9 @@ bool print_metadata(const char *path, const metadata_t *metadata)
         PRINT_ARRAY(meta_ofs, metadata2, enclave_css.body.enclave_hash.m, SGX_HASH_SIZE);
         PRINT_ELEMENT(meta_ofs, metadata2, enclave_css.body.isv_prod_id);
         PRINT_ELEMENT(meta_ofs, metadata2, enclave_css.body.isv_svn);
-    
+
         // css.buffer
-        PRINT_ARRAY(meta_ofs, metadata2, enclave_css.buffer.q1, SE_KEY_SIZE); 
+        PRINT_ARRAY(meta_ofs, metadata2, enclave_css.buffer.q1, SE_KEY_SIZE);
         PRINT_ARRAY(meta_ofs, metadata2, enclave_css.buffer.q2, SE_KEY_SIZE);
     }
 
