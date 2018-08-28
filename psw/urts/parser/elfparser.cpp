@@ -926,7 +926,7 @@ bool ElfParser::set_memory_protection(uint64_t enclave_base_addr, bool is_after_
         if(last_section_end != 0)
         {
             prot = (int)(SI_FLAG_NONE & SI_MASK_MEM_ATTRIBUTE);
-            YPHPRINT(" rva:%lx->size:%ld", last_section_end, (size_t)(rva - last_section_end));
+            YPHPRINT("rva:%lx->size:%ld", last_section_end, (size_t)(rva - last_section_end));
             ret = mprotect((void*)last_section_end, (size_t)(rva - last_section_end), prot);
             if(ret != 0)
             {
