@@ -55,7 +55,7 @@
 
 #define SGX_CPUID   0x12
 
-#define ENCLAVE_START_ADDR NULL
+#define ENCLAVE_START_ADDR (void*)0x600000000000
 
 static EnclaveCreatorHW g_enclave_creator_hw;
 
