@@ -532,9 +532,9 @@ bool CMetadata::build_layout_table()
         layout.entry.id = LAYOUT_ID_HEAP_INIT;
         layout.entry.page_count = (uint32_t)((m_create_param.heap_init_size - m_create_param.heap_min_size) >> SE_PAGE_SHIFT);
         layout.entry.attributes = PAGE_ATTR_EADD | PAGE_ATTR_POST_REMOVE | PAGE_ATTR_POST_ADD;
-        layout.entry.si_flags = SI_FLAGS_RW;
+        layout.entry.si_flags = SI_FLAGS_RWX;   //Make the heap readable|writable|executable
         m_layouts.push_back(layout);
-        YPHPRINT("build LAYOUT_ID_HEAP_INIT: npg = %d", layout.entry.page_count);
+        YPHPRINT("build LAYOUT_ID_HEAP_INIT1: npg = %d", layout.entry.page_count);
     }
 
     if(m_create_param.heap_max_size > m_create_param.heap_init_size)
@@ -544,7 +544,7 @@ bool CMetadata::build_layout_table()
         layout.entry.attributes = PAGE_ATTR_POST_ADD;
         layout.entry.si_flags = SI_FLAGS_RWX;  //Make the heap readable|writable|executable
         m_layouts.push_back(layout);
-        YPHPRINT("build LAYOUT_ID_HEAP_INIT: npg = %d", layout.entry.page_count);
+        YPHPRINT("build LAYOUT_ID_HEAP_INIT2: npg = %d", layout.entry.page_count);
     }
 
 

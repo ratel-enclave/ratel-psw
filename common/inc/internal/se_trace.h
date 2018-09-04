@@ -78,7 +78,10 @@ int se_trace_internal(int debug_level, const char *fmt, ...);
 /* New code should use SE_TRACE_DEBUG, SE_TRACE_NOTICE, SE_TRACE_WARNING, SE_TRACE_ERROR */
 #define SE_TRACE(debug_level, fmt, ...) \
 	    se_trace(debug_level, "[%s %s:%d] " fmt, __FUNCTION__, __FILE__, __LINE__, ##__VA_ARGS__)
-#define YPHPRINT(fmt, ...) printf("[%s:%d:%s:]" #fmt "\n", __FILE__, __LINE__, __FUNCTION__, ##__VA_ARGS__)
+#define YPHPRINT(fmt, ...) \
+	    printf("[%s:%d:%s:]" #fmt "\n", __FILE__, __LINE__, __FUNCTION__, ##__VA_ARGS__);	\
+	    fflush(NULL)
+
 #endif/* DISABLE_TRACE */
 
 /* SE_TRACE_DEBUG and SE_TRACE_NOTICE print the debug information plus message. */

@@ -124,6 +124,7 @@ int EnclaveCreatorHW::create_enclave(secs_t *secs, sgx_enclave_id_t *enclave_id,
     assert(secs != NULL && enclave_id != NULL && start_addr != NULL);
     UNUSED(ae);
 
+    YPHPRINT("open device /dev/sgx && ->octl(m_hdevice, SGX_IOC_ENCLAVE_CREATE, &param): ECREATE create enclave");
     if (false == open_se_device())
         return SGX_ERROR_NO_DEVICE;
 
@@ -187,7 +188,8 @@ int EnclaveCreatorHW::try_init_enclave(sgx_enclave_id_t enclave_id, enclave_css_
 {
     int ret = 0;
 
-    YPHPRINT("->ioctl() with parameter SGX_IOC_ENCLAVE_INIT or  SGX_IOC_ENCLAVE_INIT_IN_KERNEL");
+    YPHPRINT("Begin");
+    YPHPRINT("->ioctl() with parameter SGX_IOC_ENCLAVE_INIT or SGX_IOC_ENCLAVE_INIT_IN_KERNEL");
     if (m_in_kernel_driver == false)
     {
         struct sgx_enclave_init initp = { 0, 0, 0 };
@@ -222,6 +224,7 @@ int EnclaveCreatorHW::try_init_enclave(sgx_enclave_id_t enclave_id, enclave_css_
     }
     se_mutex_unlock(&m_sig_mutex);
 
+    YPHPRINT("End");
     return SGX_SUCCESS;
 }
 
