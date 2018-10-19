@@ -219,6 +219,7 @@ int EnclaveCreatorHW::try_init_enclave(sgx_enclave_id_t enclave_id, enclave_css_
     se_mutex_lock(&m_sig_mutex);
     if(false == m_sig_registered)
     {
+        YPHPRINT("->reg_sig_handler(), register signal handler at the end of enclave initialization");
         reg_sig_handler();
         m_sig_registered = true;
     }

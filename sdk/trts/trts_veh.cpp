@@ -49,6 +49,16 @@
 #include "util.h"
 #include "trts_util.h"
 
+
+#define SIGILL      4
+#define SIGABRT     6
+#define SIGFPE      8
+#define SIGSEGV     11
+#define SIGBUS      10
+#define SIGSYS      12
+#define SIGTRAP     5
+
+
 typedef struct _handler_node_t
 {
     uintptr_t callback;
@@ -185,7 +195,8 @@ extern "C" __attribute__((regparm(1))) void continue_execution(sgx_exception_inf
 //      the 2nd phrase exception handing, which traverse registered exception handlers.
 //      if the exception can be handled, then continue execution
 //      otherwise, throw abortion, go back to 1st phrase, and call the default handler.
-extern "C" __attribute__((regparm(1))) void internal_handle_exception(sgx_exception_info_t *info)
+// *supported* The signal is supported or not
+extern "C" __attribute__((regparm(1))) void _internal_handle_exception(sgx_exception_info_t *info, bool supported)
 {
     int status = EXCEPTION_CONTINUE_SEARCH;
     handler_node_t *node = NULL;
@@ -274,11 +285,23 @@ extern "C" __attribute__((regparm(1))) void internal_handle_exception(sgx_except
     }
 
     //instruction triggering the exception will be executed again.
-    continue_execution(info);
+    if (supported)
+        continue_execution(info);
 
 failed_end:
     thread_data->exception_flag = -1; // mark the current exception cannot be handled
     abort();    // throw abortion
+}
+
+
+extern "C" __attribute__((regparm(1))) void internal_handle_exception(sgx_exception_info_t *info)
+{
+    _internal_handle_exception(info, true);
+}
+
+extern "C" __attribute__((regparm(1))) void internal_handle_exception_ext(sgx_exception_info_t *info)
+{
+    _internal_handle_exception(info, false);
 }
 
 static int expand_stack_by_pages(void *start_addr, size_t page_count)
@@ -299,7 +322,7 @@ static int expand_stack_by_pages(void *start_addr, size_t page_count)
 // Return Value
 //      none zero - success
 //              0 - fail
-extern "C" sgx_status_t trts_handle_exception(void *tcs)
+extern "C" sgx_status_t trts_handle_exception(void *tcs, void *ms)
 {
     thread_data_t *thread_data = get_thread_data();
 
@@ -307,20 +330,21 @@ extern "C" sgx_status_t trts_handle_exception(void *tcs)
     sgx_exception_info_t *info = NULL;
     uintptr_t sp, *new_sp = NULL;
     size_t size = 0;
+    int signum = *(int*)ms;
+    bool appsig = false;    // The signal is triggered by App's code?
 
-    if (tcs == NULL) goto default_handler;
+    if (tcs == NULL)
+        goto default_handler;
+
     if (check_static_stack_canary(tcs) != 0)
         goto default_handler;
 
     if(get_enclave_state() != ENCLAVE_INIT_DONE)
-    {
         goto default_handler;
-    }
 
     // check if the exception is raised from 2nd phrase
-    if(thread_data->exception_flag == -1) {
+    if(thread_data->exception_flag == -1)
         goto default_handler;
-    }
 
     if ((TD2TCS(thread_data) != tcs)
             || (((thread_data->first_ssa_gpr)&(~0xfff)) - SE_PAGE_SIZE) != (uintptr_t)tcs) {
@@ -389,7 +413,10 @@ extern "C" sgx_status_t trts_handle_exception(void *tcs)
         }
     }
 
-    if(ssa_gpr->exit_info.valid != 1)
+    if (signum == 11/*SIGSEGV*/)
+        appsig = true;
+
+    if(ssa_gpr->exit_info.valid != 1 && !appsig)
     {   // exception handlers are not allowed to call in a non-exception state
         goto default_handler;
     }
@@ -420,7 +447,10 @@ extern "C" sgx_status_t trts_handle_exception(void *tcs)
 #endif
 
     new_sp = (uintptr_t *)sp;
-    ssa_gpr->REG(ip) = (size_t)internal_handle_exception; // prepare the ip for 2nd phrase handling
+    if (ssa_gpr->exit_info.valid == 1)
+        ssa_gpr->REG(ip) = (size_t)internal_handle_exception; // prepare the ip for 2nd phrase handling
+    else
+        ssa_gpr->REG(ip) = (size_t)internal_handle_exception_ext;
     ssa_gpr->REG(sp) = (size_t)new_sp;      // new stack for internal_handle_exception
     ssa_gpr->REG(ax) = (size_t)info;        // 1st parameter (info) for LINUX32
     ssa_gpr->REG(di) = (size_t)info;        // 1st parameter (info) for LINUX64, LINUX32 also uses it while restoring the context
@@ -428,6 +458,135 @@ extern "C" sgx_status_t trts_handle_exception(void *tcs)
 
     //mark valid to 0 to prevent eenter again
     ssa_gpr->exit_info.valid = 0;
+
+    return SGX_SUCCESS;
+
+default_handler:
+    g_enclave_state = ENCLAVE_CRASHED;
+    return SGX_ERROR_ENCLAVE_CRASHED;
+}
+
+extern "C" sgx_status_t trts_handle_exception_ext(void *tcs, void *ms)
+{
+    thread_data_t *thread_data = get_thread_data();
+
+    ssa_gpr_t *ssa_gpr = NULL;
+    sgx_exception_info_t *info = NULL;
+    uintptr_t sp;
+    size_t size = 0;
+    int signum = *(int*)ms;
+
+    if (tcs == NULL)
+        goto default_handler;
+
+    if (check_static_stack_canary(tcs) != 0)
+        goto default_handler;
+
+    if(get_enclave_state() != ENCLAVE_INIT_DONE)
+        goto default_handler;
+
+    // check if the exception is raised from 2nd phrase
+    if(thread_data->exception_flag == -1)
+        goto default_handler;
+
+    if ((TD2TCS(thread_data) != tcs) ||
+            (((thread_data->first_ssa_gpr)&(~0xfff)) - SE_PAGE_SIZE) != (uintptr_t)tcs) {
+        goto default_handler;
+    }
+
+    if (signum == SIGILL || signum == SIGABRT || signum == SIGSEGV ||
+            signum == SIGBUS || signum == SIGSYS || signum == SIGTRAP ||
+            signum == SIGFPE)
+        goto default_handler;
+
+    // no need to check the result of ssa_gpr because thread_data is always trusted
+    ssa_gpr = reinterpret_cast<ssa_gpr_t *>(thread_data->first_ssa_gpr);
+
+    sp = ssa_gpr->REG(sp);
+    if(!is_stack_addr((void*)sp, 0))  // check stack overrun only, alignment will be checked after exception handled
+    {
+        g_enclave_state = ENCLAVE_CRASHED;
+        return SGX_ERROR_STACK_OVERRUN;
+    }
+
+    size = 0;
+#ifdef SE_GNU64
+    size += 128; // x86_64 requires a 128-bytes red zone, which begins directly
+    // after the return addr and includes func's arguments
+#endif
+
+    // decrease the stack to give space for info
+    size += sizeof(sgx_exception_info_t);
+    sp -= size;
+    sp = sp & ~0xF;
+
+    // check the decreased sp to make sure it is in the trusted stack range
+    if(!is_stack_addr((void *)sp, size))
+    {
+        g_enclave_state = ENCLAVE_CRASHED;
+        return SGX_ERROR_STACK_OVERRUN;
+    }
+
+    info = (sgx_exception_info_t *)sp;
+    // decrease the stack to save the SSA[0]->ip
+    size = sizeof(uintptr_t);
+    sp -= size;
+    if(!is_stack_addr((void *)sp, size))
+    {
+        g_enclave_state = ENCLAVE_CRASHED;
+        return SGX_ERROR_STACK_OVERRUN;
+    }
+
+    // sp is within limit_addr and commit_addr, currently only SGX 2.0 under hardware mode will enter this branch.^M
+    if((size_t)sp < thread_data->stack_commit_addr)
+    {
+        int ret = -1;
+        size_t page_aligned_delta = 0;
+        /* try to allocate memory dynamically */
+        page_aligned_delta = ROUND_TO(thread_data->stack_commit_addr - (size_t)sp, SE_PAGE_SIZE);
+        if ((thread_data->stack_commit_addr > page_aligned_delta)
+                && ((thread_data->stack_commit_addr - page_aligned_delta) >= thread_data->stack_limit_addr))
+        {
+            ret = expand_stack_by_pages((void *)(thread_data->stack_commit_addr - page_aligned_delta), (page_aligned_delta >> SE_PAGE_SHIFT));
+        }
+        if (ret == 0)
+        {
+            thread_data->stack_commit_addr -= page_aligned_delta;
+            return SGX_SUCCESS;
+        }
+        else
+        {
+            g_enclave_state = ENCLAVE_CRASHED;
+            return SGX_ERROR_STACK_OVERRUN;
+        }
+    }
+
+    // initialize the info with SSA[0]
+    info->exception_vector = (sgx_exception_vector_t)ssa_gpr->exit_info.vector;
+    info->exception_type = (sgx_exception_type_t)ssa_gpr->exit_info.exit_type;
+
+    info->cpu_context.REG(ax) = ssa_gpr->REG(ax);
+    info->cpu_context.REG(cx) = ssa_gpr->REG(cx);
+    info->cpu_context.REG(dx) = ssa_gpr->REG(dx);
+    info->cpu_context.REG(bx) = ssa_gpr->REG(bx);
+    info->cpu_context.REG(sp) = ssa_gpr->REG(sp);
+    info->cpu_context.REG(bp) = ssa_gpr->REG(bp);
+    info->cpu_context.REG(si) = ssa_gpr->REG(si);
+    info->cpu_context.REG(di) = ssa_gpr->REG(di);
+    info->cpu_context.REG(flags) = ssa_gpr->REG(flags);
+    info->cpu_context.REG(ip) = ssa_gpr->REG(ip);
+#ifdef SE_64
+    info->cpu_context.r8  = ssa_gpr->r8;
+    info->cpu_context.r9  = ssa_gpr->r9;
+    info->cpu_context.r10 = ssa_gpr->r10;
+    info->cpu_context.r11 = ssa_gpr->r11;
+    info->cpu_context.r12 = ssa_gpr->r12;
+    info->cpu_context.r13 = ssa_gpr->r13;
+    info->cpu_context.r14 = ssa_gpr->r14;
+    info->cpu_context.r15 = ssa_gpr->r15;
+#endif
+
+    internal_handle_exception_ext(info);
 
     return SGX_SUCCESS;
 

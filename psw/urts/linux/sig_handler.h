@@ -35,4 +35,7 @@
 
 void reg_sig_handler();
 
+//The App runing in SGX tries to register a signal handler.
+void sgxapp_register_sighandler(int signum);
+
 #endif

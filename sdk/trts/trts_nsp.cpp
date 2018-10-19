@@ -221,15 +221,20 @@ extern "C" int enter_enclave(int index, void *ms, void *tcs, int cssa)
         {
             error = do_uninit_enclave(tcs);
         }
+        else if (index == ECMD_SIGNAL)
+        {
+            error = trts_handle_exception_ext(tcs, ms);
+        }
     }
     else if((cssa == 1) && (index == ECMD_EXCEPT))
     {
-        error = trts_handle_exception(tcs);
+        error = trts_handle_exception(tcs, ms);
         if (check_static_stack_canary(tcs) != 0)
         {
             error = SGX_ERROR_STACK_OVERRUN;
         }
     }
+
     if(error == SGX_ERROR_UNEXPECTED)
     {
         set_enclave_state(ENCLAVE_CRASHED);
