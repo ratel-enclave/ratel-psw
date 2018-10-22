@@ -97,9 +97,6 @@ typedef struct _sigctx_knl_t {
     unsigned long   sig;
 }sigctx_knl_t;
 
-/* A package stores all contxt information,  */
-typedef kernel_ucontext_t sigctx_knl_t;
-
 /* A package stores all contxt information, compatible with DynamoRIO's sigframe_rt_t */
 typedef struct _sigcxt_pkg_t {
     union {
