@@ -97,11 +97,17 @@ typedef struct _sigctx_knl_t {
     unsigned long   sig;
 }sigctx_knl_t;
 
-/* A package stores all contxt information */
+/* A package stores all contxt information,  */
+typedef kernel_ucontext_t sigctx_knl_t;
+
+/* A package stores all contxt information, compatible with DynamoRIO's sigframe_rt_t */
 typedef struct _sigcxt_pkg_t {
-    int         signum;
-    siginfo_t       info;
+    union {
+        char    *pretcode;
+        int     signum;
+    };
     sigctx_knl_t    ctx;
+    siginfo_t       info;
 }sigcxt_pkg_t;
 
 void sig_handler(int signum, siginfo_t* siginfo, void *priv)
