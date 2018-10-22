@@ -330,8 +330,6 @@ extern "C" sgx_status_t trts_handle_exception(void *tcs, void *ms)
     sgx_exception_info_t *info = NULL;
     uintptr_t sp, *new_sp = NULL;
     size_t size = 0;
-    int signum = *(int*)ms;
-    bool appsig = false;    // The signal is triggered by App's code?
 
     if (tcs == NULL)
         goto default_handler;
@@ -364,7 +362,7 @@ extern "C" sgx_status_t trts_handle_exception(void *tcs, void *ms)
     size = 0;
 #ifdef SE_GNU64
     size += 128; // x86_64 requires a 128-bytes red zone, which begins directly
-                 // after the return addr and includes func's arguments
+    // after the return addr and includes func's arguments
 #endif
 
     // decrease the stack to give space for info
@@ -413,13 +411,11 @@ extern "C" sgx_status_t trts_handle_exception(void *tcs, void *ms)
         }
     }
 
-    if (signum == 11/*SIGSEGV*/)
-        appsig = true;
 
-    if(ssa_gpr->exit_info.valid != 1 && !appsig)
-    {   // exception handlers are not allowed to call in a non-exception state
-        goto default_handler;
-    }
+    // if(ssa_gpr->exit_info.valid != 1)
+    // {   // exception handlers are not allowed to call in a non-exception state
+    //     goto default_handler;
+    // }
 
     // initialize the info with SSA[0]
     info->exception_vector = (sgx_exception_vector_t)ssa_gpr->exit_info.vector;
@@ -445,12 +441,13 @@ extern "C" sgx_status_t trts_handle_exception(void *tcs, void *ms)
     info->cpu_context.r14 = ssa_gpr->r14;
     info->cpu_context.r15 = ssa_gpr->r15;
 #endif
+    info->sigcxt_pkg = ms;
 
     new_sp = (uintptr_t *)sp;
     if (ssa_gpr->exit_info.valid == 1)
         ssa_gpr->REG(ip) = (size_t)internal_handle_exception; // prepare the ip for 2nd phrase handling
     else
-        ssa_gpr->REG(ip) = (size_t)internal_handle_exception_ext;
+        ssa_gpr->REG(ip) = (size_t)internal_handle_exception_ext; // The signal is triggered by App's code?
     ssa_gpr->REG(sp) = (size_t)new_sp;      // new stack for internal_handle_exception
     ssa_gpr->REG(ax) = (size_t)info;        // 1st parameter (info) for LINUX32
     ssa_gpr->REG(di) = (size_t)info;        // 1st parameter (info) for LINUX64, LINUX32 also uses it while restoring the context
@@ -466,6 +463,7 @@ default_handler:
     return SGX_ERROR_ENCLAVE_CRASHED;
 }
 
+/* exception triggered when running out-sgx code */
 extern "C" sgx_status_t trts_handle_exception_ext(void *tcs, void *ms)
 {
     thread_data_t *thread_data = get_thread_data();
@@ -496,8 +494,9 @@ extern "C" sgx_status_t trts_handle_exception_ext(void *tcs, void *ms)
 
     if (signum == SIGILL || signum == SIGABRT || signum == SIGSEGV ||
             signum == SIGBUS || signum == SIGSYS || signum == SIGTRAP ||
-            signum == SIGFPE)
+            signum == SIGFPE) {
         goto default_handler;
+    }
 
     // no need to check the result of ssa_gpr because thread_data is always trusted
     ssa_gpr = reinterpret_cast<ssa_gpr_t *>(thread_data->first_ssa_gpr);
@@ -585,6 +584,7 @@ extern "C" sgx_status_t trts_handle_exception_ext(void *tcs, void *ms)
     info->cpu_context.r14 = ssa_gpr->r14;
     info->cpu_context.r15 = ssa_gpr->r15;
 #endif
+    info->sigcxt_pkg = ms;
 
     internal_handle_exception_ext(info);
 

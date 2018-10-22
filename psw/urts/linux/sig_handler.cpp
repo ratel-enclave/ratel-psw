@@ -88,6 +88,22 @@ static struct sigaction g_old_sigact[_NSIG];
 
 void reg_sig_handler();
 
+/* A variant of kernel_ucontext_t */
+typedef struct _sigctx_knl_t {
+    unsigned long   uc_flags;
+    ucontext        *uc_link;
+    stack_t     uc_stack;
+    mcontext_t  uc_mcontext;
+    unsigned long   sig;
+}sigctx_knl_t;
+
+/* A package stores all contxt information */
+typedef struct _sigcxt_pkg_t {
+    int         signum;
+    siginfo_t       info;
+    sigctx_knl_t    ctx;
+}sigcxt_pkg_t;
+
 void sig_handler(int signum, siginfo_t* siginfo, void *priv)
 {
     SE_TRACE(SE_TRACE_DEBUG, "signal handler is triggered\n");
@@ -99,6 +115,7 @@ void sig_handler(int signum, siginfo_t* siginfo, void *priv)
     size_t xbx = context->uc_mcontext.gregs[REG_XBX];
 #endif
     ecall_param_t *param = ECALL_PARAM;
+    sigcxt_pkg_t   pkg;
 
     //the case of exception on ERESUME or within enclave.
     //We can't distinguish ERESUME exception from exception within enclave. We assume it is the exception within enclave.
@@ -113,7 +130,10 @@ void sig_handler(int signum, siginfo_t* siginfo, void *priv)
         //If exception is raised in trts again and again, the SSA will overflow, and finally it is EENTER exception.
         assert(reinterpret_cast<tcs_t *>(xbx) == param->tcs);
         CEnclave *enclave = param->trust_thread->get_enclave();
-        unsigned int ret = enclave->ecall(ECMD_EXCEPT, param->ocall_table, &signum);
+        pkg.signum = signum;
+        pkg.info = *siginfo;
+        memcpy(&pkg.ctx, context, sizeof(pkg.ctx));
+        unsigned int ret = enclave->ecall(ECMD_EXCEPT, param->ocall_table, &pkg);
         if(SGX_SUCCESS == ret)
         {
             //ERESUME execute
@@ -153,7 +173,10 @@ void sig_handler(int signum, siginfo_t* siginfo, void *priv)
         //If exception is raised in trts again and again, the SSA will overflow, and finally it is EENTER exception.
         assert(reinterpret_cast<tcs_t *>(xbx) == param->tcs);
         CEnclave *enclave = param->trust_thread->get_enclave();
-        unsigned int ret = enclave->ecall(ECMD_SIGNAL, param->ocall_table, &signum);
+        pkg.signum = signum;
+        pkg.info = *siginfo;
+        memcpy(&pkg.ctx, context, sizeof(pkg.ctx));
+        unsigned int ret = enclave->ecall(ECMD_SIGNAL, param->ocall_table, &pkg);
         if(SGX_SUCCESS == ret)
         {
             //ERESUME execute

@@ -108,6 +108,7 @@ typedef struct _exception_info_t
     sgx_cpu_context_t      cpu_context;
     sgx_exception_vector_t exception_vector;
     sgx_exception_type_t   exception_type;
+    void*                  sigcxt_pkg;  /* pointing to external structure that keeps all informaiton */
 } sgx_exception_info_t;
 
 typedef int (*sgx_exception_handler_t)(sgx_exception_info_t *info);
