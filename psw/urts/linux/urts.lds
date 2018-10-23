@@ -8,6 +8,7 @@
         sgx_thread_setwait_untrusted_events_ocall;
         sgx_thread_set_multiple_untrusted_events_ocall;
         sgx_oc_cpuidex;
+        sgxapp_reg_sighandler;
     local:
         *;
 };

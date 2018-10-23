@@ -36,6 +36,7 @@
 #include "se_trace.h"
 #include "rts.h"
 #include "enclave.h"
+#include "sig_handler.h"
 #include <assert.h>
 #include <signal.h>
 #include <string.h>
@@ -85,8 +86,6 @@ extern "C" void *get_aep();
 extern "C" void *get_eenterp();
 extern "C" void *get_eretp();
 static struct sigaction g_old_sigact[_NSIG];
-
-void reg_sig_handler();
 
 /* A variant of kernel_ucontext_t */
 typedef struct _sigctx_knl_t {
@@ -236,7 +235,7 @@ void sig_handler(int signum, siginfo_t* siginfo, void *priv)
     }
 }
 
-void reg_sig_handler()
+void reg_sig_handler(void)
 {
     int ret = 0;
     struct sigaction sig_act;
@@ -270,9 +269,11 @@ void reg_sig_handler()
     if (0 != ret) abort();
     ret = sigaction(SIGTRAP, &sig_act, &g_old_sigact[SIGTRAP]);
     if (0 != ret) abort();
+    /* making sgxapp_register_sighandler unresolved for exporting */
+    // if (0 != ret) sgxapp_reg_sighandler(0);
 }
 
-void sgxapp_register_sighandler(int signum)
+void sgxapp_reg_sighandler(int signum)
 {
     struct sigaction sig_act;
     int ret = 0;

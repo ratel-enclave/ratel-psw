@@ -33,9 +33,18 @@
 #ifndef _SIG_HANDLER_H_
 #define _SIG_HANDLER_H_
 
-void reg_sig_handler();
+void reg_sig_handler(void);
 
-//The App runing in SGX tries to register a signal handler.
-void sgxapp_register_sighandler(int signum);
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// The App runing in SGX tries to register a signal handler.
+// The function name should not longer than 26 bytes
+void sgxapp_reg_sighandler(int signum);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
