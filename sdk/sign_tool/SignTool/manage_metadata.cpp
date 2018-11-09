@@ -409,6 +409,8 @@ bool CMetadata::check_xml_parameter(const xml_parameter_t *parameter)
     m_create_param.heap_init_size = parameter[HEAPINITSIZE].flag ? parameter[HEAPINITSIZE].value : parameter[HEAPMAXSIZE].value;
     m_create_param.heap_min_size = parameter[HEAPMINSIZE].value;
     m_create_param.heap_max_size = parameter[HEAPMAXSIZE].value;
+    m_create_param.dyRIO_cache_size = parameter[DYRIOCODECACHESIZE].value;
+    m_create_param.prog_arena_size = parameter[SGXEVPROGARENASIZE].value;
     m_create_param.stack_max_size = parameter[STACKMAXSIZE].value;
     m_create_param.stack_min_size = parameter[STACKMINSIZE].value;
     m_create_param.tcs_num = (uint32_t)parameter[TCSNUM].value;
@@ -532,9 +534,9 @@ bool CMetadata::build_layout_table()
         layout.entry.id = LAYOUT_ID_HEAP_INIT;
         layout.entry.page_count = (uint32_t)((m_create_param.heap_init_size - m_create_param.heap_min_size) >> SE_PAGE_SHIFT);
         layout.entry.attributes = PAGE_ATTR_EADD | PAGE_ATTR_POST_REMOVE | PAGE_ATTR_POST_ADD;
-        layout.entry.si_flags = SI_FLAGS_RWX;   //Make the heap readable|writable|executable
+        layout.entry.si_flags = SI_FLAGS_RW;
         m_layouts.push_back(layout);
-        YPHPRINT("build LAYOUT_ID_HEAP_INIT1: npg = %d", layout.entry.page_count);
+        YPHPRINT("build LAYOUT_ID_HEAP_INIT: npg = %d", layout.entry.page_count);
     }
 
     if(m_create_param.heap_max_size > m_create_param.heap_init_size)
@@ -542,9 +544,37 @@ bool CMetadata::build_layout_table()
         layout.entry.id = LAYOUT_ID_HEAP_MAX;
         layout.entry.page_count = (uint32_t)((m_create_param.heap_max_size - m_create_param.heap_init_size) >> SE_PAGE_SHIFT);
         layout.entry.attributes = PAGE_ATTR_POST_ADD;
-        layout.entry.si_flags = SI_FLAGS_RWX;  //Make the heap readable|writable|executable
+        layout.entry.si_flags = SI_FLAGS_RW;
         m_layouts.push_back(layout);
-        YPHPRINT("build LAYOUT_ID_HEAP_INIT2: npg = %d", layout.entry.page_count);
+        YPHPRINT("build LAYOUT_ID_HEAP_MAX: npg = %d", layout.entry.page_count);
+    }
+
+    // DynamoRIO's code-cache
+    if (m_create_param.dyRIO_cache_size > 0) {
+        // guard page
+        m_layouts.push_back(guard_page);
+        YPHPRINT("add  guard_page: npg = %d", guard_page.entry.page_count);
+
+        layout.entry.id = LAYOUT_ID_DYRIO_CODE_CACHE;
+        layout.entry.page_count = (uint32_t)(m_create_param.dyRIO_cache_size >> SE_PAGE_SHIFT);
+        layout.entry.attributes = PAGE_ATTR_EADD | PAGE_ATTR_POST_REMOVE | PAGE_ATTR_POST_ADD;
+        layout.entry.si_flags = SI_FLAGS_RWX;   //Make the heap readable|writable|executable
+        m_layouts.push_back(layout);
+        YPHPRINT("build LAYOUT_ID_DYRIO_CODE_CACHE: npg = %d", layout.entry.page_count);
+    }
+
+    // Buffer to store code/data segments of target program
+    if (m_create_param.prog_arena_size   > 0) {
+        // guard page
+        m_layouts.push_back(guard_page);
+        YPHPRINT("add  guard_page: npg = %d", guard_page.entry.page_count);
+
+        layout.entry.id = LAYOUT_ID_SGXEV_PROG_ARENA;
+        layout.entry.page_count = (uint32_t)(m_create_param.prog_arena_size >> SE_PAGE_SHIFT);
+        layout.entry.attributes = PAGE_ATTR_EADD | PAGE_ATTR_POST_REMOVE | PAGE_ATTR_POST_ADD;
+        layout.entry.si_flags = SI_FLAGS_RW;
+        m_layouts.push_back(layout);
+        YPHPRINT("build LAYOUT_ID_SGXEV_PROG_ARENA: npg = %d", layout.entry.page_count);
     }
 
 
@@ -590,7 +620,7 @@ bool CMetadata::build_layout_table()
         return false;
     }
     layout.entry.content_offset = (uint32_t)PTR_DIFF(tcs_template, m_metadata),
-    layout.entry.content_size = TCS_TEMPLATE_SIZE;
+        layout.entry.content_size = TCS_TEMPLATE_SIZE;
     m_layouts.push_back(layout);
     YPHPRINT("build LAYOUT_ID_TCS: npg = %d", layout.entry.page_count);
 

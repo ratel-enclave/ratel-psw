@@ -43,15 +43,41 @@ namespace {
         return NULL;
     }
     bool do_update_global_data(const metadata_t *const metadata,
-                                const create_param_t* const create_param,
-                               global_data_t* global_data)
+            const create_param_t* const create_param,
+            global_data_t* global_data)
     {
-        layout_entry_t *layout_heap = get_entry_by_id(metadata, LAYOUT_ID_HEAP_MIN);
+        layout_entry_t *layout_heap;
 
         global_data->enclave_size = (sys_word_t)metadata->enclave_size;
+        layout_heap = get_entry_by_id(metadata, LAYOUT_ID_HEAP_MIN);
         global_data->heap_offset = (sys_word_t)layout_heap->rva;
         global_data->heap_size = (sys_word_t)(create_param->heap_init_size);
         global_data->thread_policy = (sys_word_t)metadata->tcs_policy;
+
+        // DynamoRIO's code cache
+        if (create_param->dyRIO_cache_size > 0) {
+            YPHPRINT("Set dyRIO_cache_offset && dyRIO_cache_size");
+            layout_heap = get_entry_by_id(metadata, LAYOUT_ID_DYRIO_CODE_CACHE);
+            global_data->dyRIO_cache_offset = (sys_word_t)layout_heap->rva;
+            global_data->dyRIO_cache_size = (sys_word_t)(create_param->dyRIO_cache_size);
+        }
+        else {
+            global_data->dyRIO_cache_offset = 0;
+            global_data->dyRIO_cache_size = 0;
+        }
+
+        // Target-App's arena
+        if (create_param->prog_arena_size > 0) {
+            YPHPRINT("Set prog_arena_offset && prog_arena_size");
+            layout_heap = get_entry_by_id(metadata, LAYOUT_ID_SGXEV_PROG_ARENA);
+            global_data->prog_arena_offset = (sys_word_t)layout_heap->rva;
+            global_data->prog_arena_size = (sys_word_t)(create_param->prog_arena_size);
+        }
+        else {
+            global_data->prog_arena_offset = 0;
+            global_data->prog_arena_size = 0;
+        }
+
         thread_data_t *thread_data = &global_data->td_template;
 
         thread_data->stack_limit_addr = (sys_word_t)create_param->stack_limit_addr;
@@ -66,23 +92,23 @@ namespace {
         thread_data->tls_array = thread_data->self_addr + (sys_word_t)offsetof(thread_data_t, tls_addr);
 
         // TCS template
-        if(0 != memcpy_s(&global_data->tcs_template, sizeof(global_data->tcs_template), 
-                          GET_PTR(void, metadata, get_entry_by_id(metadata, LAYOUT_ID_TCS)->content_offset), 
-                          get_entry_by_id(metadata, LAYOUT_ID_TCS)->content_size))
+        if(0 != memcpy_s(&global_data->tcs_template, sizeof(global_data->tcs_template),
+                    GET_PTR(void, metadata, get_entry_by_id(metadata, LAYOUT_ID_TCS)->content_offset),
+                    get_entry_by_id(metadata, LAYOUT_ID_TCS)->content_size))
         {
             return false;
         }
 
-        // layout table: dynamic heap + dynamic thread group 
+        // layout table: dynamic heap + dynamic thread group
         layout_entry_t *layout_start = GET_PTR(layout_entry_t, metadata, metadata->dirs[DIR_LAYOUT].offset);
         layout_entry_t *layout_end = GET_PTR(layout_entry_t, metadata, metadata->dirs[DIR_LAYOUT].offset + metadata->dirs[DIR_LAYOUT].size);
         global_data->layout_entry_num = 0;
         for (layout_entry_t *layout = layout_start; layout < layout_end; layout++)
         {
-            if(0 != memcpy_s(&global_data->layout_table[global_data->layout_entry_num], 
-                     sizeof(global_data->layout_table) - global_data->layout_entry_num * sizeof(layout_t), 
-                     layout, 
-                     sizeof(layout_t)))
+            if(0 != memcpy_s(&global_data->layout_table[global_data->layout_entry_num],
+                        sizeof(global_data->layout_table) - global_data->layout_entry_num * sizeof(layout_t),
+                        layout,
+                        sizeof(layout_t)))
             {
                 return false;
             }

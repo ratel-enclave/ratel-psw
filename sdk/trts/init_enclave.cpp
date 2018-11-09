@@ -54,7 +54,7 @@ uint64_t g_cpu_feature_indicator = 0;
 int EDMM_supported = 0;
 sdk_version_t g_sdk_version = SDK_VERSION_1_5;
 
-const volatile global_data_t g_global_data = {1, 2, 3, 4,
+const volatile global_data_t g_global_data = {1, 2, 3, 4, 0, 0, 0, 0,
    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, {0, 0, 0, 0, 0, 0}, 0, NULL, NULL, NULL}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 0, 0, {{{0, 0, 0, 0, 0, 0, 0}}}};
 uint32_t g_enclave_state = ENCLAVE_INIT_NOT_STARTED;
 

@@ -995,25 +995,28 @@ static bool dump_enclave_metadata(const char *enclave_path, const char *dumpfile
 }
 int main(int argc, char* argv[])
 {
-    xml_parameter_t parameter[] = {{"ProdID", 0xFFFF, 0, 0, 0},
-                                   {"ISVSVN", 0xFFFF, 0, 0, 0},
-                                   {"ReleaseType", 1, 0, 0, 0},
-                                   {"IntelSigned", 1, 0, 0, 0},
-                                   {"ProvisionKey",1,0,0,0},
-                                   {"LaunchKey",1,0,0,0},
-                                   {"DisableDebug",1,0,0,0},
-                                   {"HW", 0x10,0,0,0},
-                                   {"TCSNum",0xFFFFFFFF,TCS_NUM_MIN,TCS_NUM_MIN,0},
-                                   {"TCSMaxNum",0xFFFFFFFF,TCS_NUM_MIN,TCS_NUM_MIN,0},
-                                   {"TCSMinPool",0xFFFFFFFF,0,TCS_NUM_MIN,0},
-                                   {"TCSPolicy",TCS_POLICY_UNBIND,TCS_POLICY_BIND,TCS_POLICY_UNBIND,0},
-                                   {"StackMaxSize",0x1FFFFFFFFF,STACK_SIZE_MIN,STACK_SIZE_MAX,0},
-                                   {"StackMinSize",0x1FFFFFFFFF,STACK_SIZE_MIN,STACK_SIZE_MIN,0},
-                                   {"HeapMaxSize",0x1FFFFFFFFF,0,HEAP_SIZE_MAX,0},
-                                   {"HeapMinSize",0x1FFFFFFFFF,0,HEAP_SIZE_MIN,0},
-                                   {"HeapInitSize",0x1FFFFFFFFF,0,HEAP_SIZE_MIN,0},
-                                   {"MiscSelect", 0xFFFFFFFF, 0, DEFAULT_MISC_SELECT, 0},
-                                   {"MiscMask", 0xFFFFFFFF, 0, DEFAULT_MISC_MASK, 0}};
+    xml_parameter_t parameter[] = {
+        {"ProdID", 0xFFFF, 0, 0, 0},
+        {"ISVSVN", 0xFFFF, 0, 0, 0},
+        {"ReleaseType", 1, 0, 0, 0},
+        {"IntelSigned", 1, 0, 0, 0},
+        {"ProvisionKey",1,0,0,0},
+        {"LaunchKey",1,0,0,0},
+        {"DisableDebug",1,0,0,0},
+        {"HW", 0x10,0,0,0},
+        {"TCSNum",0xFFFFFFFF,TCS_NUM_MIN,TCS_NUM_MIN,0},
+        {"TCSMaxNum",0xFFFFFFFF,TCS_NUM_MIN,TCS_NUM_MIN,0},
+        {"TCSMinPool",0xFFFFFFFF,0,TCS_NUM_MIN,0},
+        {"TCSPolicy",TCS_POLICY_UNBIND,TCS_POLICY_BIND,TCS_POLICY_UNBIND,0},
+        {"StackMaxSize",0x1FFFFFFFFF,STACK_SIZE_MIN,STACK_SIZE_MAX,0},
+        {"StackMinSize",0x1FFFFFFFFF,STACK_SIZE_MIN,STACK_SIZE_MIN,0},
+        {"HeapMaxSize",0x1FFFFFFFFF,0,HEAP_SIZE_MAX,0},
+        {"HeapMinSize",0x1FFFFFFFFF,0,HEAP_SIZE_MIN,0},
+        {"HeapInitSize",0x1FFFFFFFFF,0,HEAP_SIZE_MIN,0},
+        {"DynamorioCodeCacheSize",0x1FFFFFFFFF,0,DYRIO_CODE_CACHE_SIZE,0},
+        {"TargetProgramArenaSize",0x1FFFFFFFFF,0,SGXEV_PROG_ARENA_SIZE,0},
+        {"MiscSelect", 0xFFFFFFFF, 0, DEFAULT_MISC_SELECT, 0},
+        {"MiscMask", 0xFFFFFFFF, 0, DEFAULT_MISC_MASK, 0}};
 
     const char *path[8] = {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
     uint8_t enclave_hash[SGX_HASH_SIZE] = {0};

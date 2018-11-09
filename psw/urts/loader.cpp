@@ -357,8 +357,10 @@ int CLoader::build_context(const uint64_t start_rva, layout_entry_t *layout)
     YPHPRINT("->build_pages() && ->build_mem_region()");
     assert(IS_PAGE_ALIGNED(rva));
 
+    YPHPRINT("layout id: %d", layout->id);
     if (layout->attributes & PAGE_ATTR_EADD)
     {
+        YPHPRINT("layout has PAGE_ATTR_EADD attribute");
         uint16_t attributes = layout->attributes;
 #ifdef SE_SIM
         attributes = attributes & (uint16_t)(~PAGE_ATTR_EREMOVE);
@@ -366,6 +368,7 @@ int CLoader::build_context(const uint64_t start_rva, layout_entry_t *layout)
 
         if (layout->content_offset)
         {
+            YPHPRINT("layout has content");
             if(layout->si_flags == SI_FLAGS_TCS)
             {
                 YPHPRINT("->build_pages() to build tcs_t page");
@@ -388,7 +391,7 @@ int CLoader::build_context(const uint64_t start_rva, layout_entry_t *layout)
             }
             else // guard page should not have content_offset != 0
             {
-
+                YPHPRINT("layout isn't TCS page");
                 section_info_t sec_info = {GET_PTR(uint8_t, m_metadata, layout->content_offset), layout->content_size, rva, ((uint64_t)layout->page_count) << SE_PAGE_SHIFT, layout->si_flags, NULL};
                 if(SGX_SUCCESS != (ret = build_mem_region(sec_info)))
                 {
@@ -398,6 +401,7 @@ int CLoader::build_context(const uint64_t start_rva, layout_entry_t *layout)
         }
         else if (layout->si_flags != SI_FLAG_NONE)
         {
+            YPHPRINT("layout doesn't have content");
             sinfo.flags = layout->si_flags;
 
             void *source = NULL;
@@ -420,6 +424,7 @@ int CLoader::build_context(const uint64_t start_rva, layout_entry_t *layout)
 
     if(layout->attributes & PAGE_ATTR_POST_ADD)
     {
+        YPHPRINT("layout has PAGE_ATTR_POST_ADD attribute");
 #ifndef SE_SIM
         if(layout->id == LAYOUT_ID_TCS_DYN)
         {
@@ -882,7 +887,7 @@ int CLoader::set_context_protection(layout_t *layout_start, layout_t *layout_end
 #endif
             }
 
-            YPHPRINT("mprotect(rva=%lx, len=%lx, flags=%x",
+            YPHPRINT("mprotect(rva=%lx, len=%lx, flags=%x)",
                 (uint64_t)m_start_addr + layout->entry.rva + delta,
                 (uint64_t)layout->entry.page_count << SE_PAGE_SHIFT, prot);
 

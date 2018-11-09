@@ -182,7 +182,15 @@ static int check_dynamic_range(void *addr, size_t page_count, size_t *offset, st
     // check heap range
     if (0 == check_dynamic_entry_range(addr, page_count, LAYOUT_ID_HEAP_INIT, 0, fa))
         return 0;
-    
+
+    // check code cache
+    if (0 == check_dynamic_entry_range(addr, page_count, LAYOUT_ID_DYRIO_CODE_CACHE, 0, fa))
+        return 0;
+
+    // check prog_modls
+    if (0 == check_dynamic_entry_range(addr, page_count, LAYOUT_ID_SGXEV_PROG_ARENA, 0, fa))
+        return 0;
+
     // check dynamic thread entries range
     if (NULL != (dt_layout = get_dynamic_layout_by_id(LAYOUT_ID_THREAD_GROUP_DYN)))
     {
@@ -271,7 +279,7 @@ int sgx_accept_forward(si_flags_t sfl, size_t lo, size_t hi)
 }
 
 // High level API to EACCEPT pages, mainly used in exception handling
-// to deal with stack expansion. 
+// to deal with stack expansion.
 int apply_pages_within_exception(void *start_address, size_t page_count)
 {
 #ifdef SE_SIM
@@ -283,7 +291,7 @@ int apply_pages_within_exception(void *start_address, size_t page_count)
 
     if (start_address == NULL)
         return -1;
-    
+
     if (check_dynamic_range(start_address, page_count, NULL, NULL) != 0)
         return -1;
 
@@ -310,7 +318,7 @@ int apply_EPC_pages(void *start_address, size_t page_count)
 
     if (start_address == NULL)
         return -1;
-    
+
     if (check_dynamic_range(start_address, page_count, NULL, &fa) != 0)
         return -1;
 
@@ -356,7 +364,7 @@ int trim_EPC_pages(void *start_address, size_t page_count)
 
     rc = sgx_accept_forward(SI_FLAG_TRIM | SI_FLAG_MODIFIED, start, end);
     assert(rc == 0);
-    
+
     // trim commit ocall
     size_t i = start;
     while (i < end)

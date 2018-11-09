@@ -32,8 +32,8 @@
 
 /**
  * File: global_data.h
- * Description: 
- *     The file defines the structure global_data_t. 
+ * Description:
+ *     The file defines the structure global_data_t.
  */
 
 #ifndef _TRTS_GLOBAL_DATA_H_
@@ -51,6 +51,10 @@ typedef struct _global_data_t
     sys_word_t     heap_offset;
     sys_word_t     heap_size;
     sys_word_t     thread_policy;
+    sys_word_t     dyRIO_cache_offset;  // dynamoRIO's code-cache
+    sys_word_t     dyRIO_cache_size;
+    sys_word_t     prog_arena_offset;   // target program's modules
+    sys_word_t     prog_arena_size;
     thread_data_t  td_template;
     uint8_t        tcs_template[TCS_TEMPLATE_SIZE];
     uint32_t       layout_entry_num;

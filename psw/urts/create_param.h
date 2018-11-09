@@ -46,6 +46,10 @@ typedef struct _create_param_t
     uint64_t          heap_min_size;
     uint64_t          heap_init_size;
     uint64_t          heap_offset;
+    uint64_t          dyRIO_cache_size;
+    uint64_t          dyRIO_cache_offset;
+    uint64_t          prog_arena_size;
+    uint64_t          prog_arena_offset;
     uint64_t          first_ssa_gpr;
     uint64_t          td_addr;
     uint64_t          tls_addr;
