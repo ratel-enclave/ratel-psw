@@ -57,6 +57,7 @@ sdk_version_t g_sdk_version = SDK_VERSION_1_5;
 const volatile global_data_t g_global_data = {1, 2, 3, 4, 0, 0, 0, 0,
    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, {0, 0, 0, 0, 0, 0}, 0, NULL, NULL, NULL}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 0, 0, {{{0, 0, 0, 0, 0, 0, 0}}}};
 uint32_t g_enclave_state = ENCLAVE_INIT_NOT_STARTED;
+void* g_enclave_image_base = NULL;
 
 extern "C" {
 uintptr_t __stack_chk_guard = 0;
@@ -185,6 +186,7 @@ sgx_status_t do_init_enclave(void *ms, void *tcs)
     }
 
     g_enclave_state = ENCLAVE_INIT_DONE;
+    g_enclave_image_base = enclave_base;
     return SGX_SUCCESS;
 }
 
