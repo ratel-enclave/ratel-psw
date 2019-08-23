@@ -35,16 +35,17 @@
 
 void reg_sig_handler(void);
 
+/* Begin: Added by Pinghai */
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 // The App runing in SGX tries to register a signal handler.
-// The function name should not longer than 26 bytes
 void sgxapp_reg_sighandler(int signum);
 
 #ifdef __cplusplus
 }
 #endif
+/* End: Added by Pinghai */
 
 #endif

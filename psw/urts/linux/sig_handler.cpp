@@ -87,6 +87,10 @@ extern "C" void *get_eenterp();
 extern "C" void *get_eretp();
 static struct sigaction g_old_sigact[_NSIG];
 
+/* Begin: Added by Pinghai
+ * Data structures for solving compatibility problems among functions accross sgx-boundary
+ */
+
 /* A variant of kernel_ucontext_t */
 typedef struct _sigctx_knl_t {
     unsigned long   uc_flags;
@@ -105,6 +109,8 @@ typedef struct _sigcxt_pkg_t {
     sigctx_knl_t    ctx;
     siginfo_t       info;
 }sigcxt_pkg_t;
+
+/* End: Added by Pinghai */
 
 void sig_handler(int signum, siginfo_t* siginfo, void *priv)
 {
