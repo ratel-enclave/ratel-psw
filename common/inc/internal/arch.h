@@ -291,7 +291,7 @@ typedef struct _wl_provider_cert_t                  /* All fields are big endian
     sgx_ec256_public_t      pub_key;                /* ( 8) ECDSA public key of the Enclave Signing Key White List Provider identified by WLProviderID */
     sgx_ec256_signature_t   signature;              /* (72) ECDSA Signature by WL Root CA identified by WLRootID */
 }wl_provider_cert_t;
-se_static_assert(sizeof(wl_provider_cert_t) == 136);
+//se_static_assert(sizeof(wl_provider_cert_t) == 136);
 typedef struct _wl_cert_chain_t
 {
     wl_provider_cert_t      wl_provider_cert;
