@@ -72,7 +72,7 @@ static void init_stack_guard(void *tcs)
 }
 
 
-
+/* Begin: Added by Pinghai */
 //#if defined(LINUX64)
 
 #define UPDATE_FS 10
@@ -185,6 +185,7 @@ void _eexit_update_master_tls(void)
 
 }
 //#endif
+/* End: Added by Pinghai */
 
 
 extern "C" int enter_enclave(int index, void *ms, void *tcs, int cssa)
@@ -221,10 +222,12 @@ extern "C" int enter_enclave(int index, void *ms, void *tcs, int cssa)
         {
             error = do_uninit_enclave(tcs);
         }
+		/* Begin: Added by Pinghai */
         else if (index == ECMD_SIGNAL)
         {
-            error = trts_handle_exception_ext(tcs, ms);
+            error = trts_handle_sgxapp_signal(tcs, ms);
         }
+		/* End: Added by Pinghai */
     }
     else if((cssa == 1) && (index == ECMD_EXCEPT))
     {

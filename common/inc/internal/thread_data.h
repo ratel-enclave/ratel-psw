@@ -112,10 +112,12 @@ typedef struct _thread_data_t
 #endif
     sys_word_t  cxx_thread_info[6];
     sys_word_t  stack_commit_addr;
+	/* Begin: Added by Pinghai */
     sys_word_t  master_tls_segment; /* is master fs/gs segment or not? */
     /*Load them when EENTERing */
     struct _thread_data_t *fsbase;  /* 1. for master fs/gs-segment, always points to current fs/gs-segment */
     struct _thread_data_t *gsbase;  /* 2. for slave fs/gs-segment, always points to master fs/gs-segment */
+	/* End: Added by Pinghai */
 } thread_data_t;
 
 #ifdef __cplusplus
@@ -124,6 +126,7 @@ extern "C" {
 
 thread_data_t *get_thread_data(void);
 
+/* Begin: Added by Pinghai */
 #if defined(LINUX64)
 
 void init_slave_thread_data(thread_data_t *td);
@@ -132,6 +135,7 @@ void load_gsbase(sys_word_t base);
 
 
 #endif
+/* End: Added by Pinghai */
 
 #ifdef __cplusplus
 }

@@ -40,7 +40,7 @@ void reg_sig_handler(void);
 extern "C" {
 #endif
 
-// The App runing in SGX tries to register a signal handler.
+// Interface for sgx-app registering signal handlers.
 void sgxapp_reg_sighandler(int signum);
 
 #ifdef __cplusplus

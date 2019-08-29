@@ -70,7 +70,9 @@ sgx_status_t do_init_enclave(void *ms, void *tcs);
 sgx_status_t do_ecall(int index, void *ms, void *tcs);
 sgx_status_t do_oret(void *ms);
 sgx_status_t trts_handle_exception(void *tcs, void *ms);
-sgx_status_t trts_handle_exception_ext(void *tcs, void *ms);
+/* Begin: Added by Pinghai */
+sgx_status_t trts_handle_sgxapp_signal(void *tcs, void *ms);
+/* End: Added by Pinghai */
 sgx_status_t do_ecall_add_thread(void *ms, void *tcs);
 sgx_status_t do_uninit_enclave(void *tcs);
 int check_static_stack_canary(void *tcs);

@@ -49,7 +49,7 @@
 #include "util.h"
 #include "trts_util.h"
 
-
+/* Begin: Added by Pinghai */
 #define SIGILL      4
 #define SIGABRT     6
 #define SIGFPE      8
@@ -57,7 +57,7 @@
 #define SIGBUS      10
 #define SIGSYS      12
 #define SIGTRAP     5
-
+/* End: Added by Pinghai */
 
 typedef struct _handler_node_t
 {
@@ -195,8 +195,11 @@ extern "C" __attribute__((regparm(1))) void continue_execution(sgx_exception_inf
 //      the 2nd phrase exception handing, which traverse registered exception handlers.
 //      if the exception can be handled, then continue execution
 //      otherwise, throw abortion, go back to 1st phrase, and call the default handler.
-// *supported* The signal is supported or not
-extern "C" __attribute__((regparm(1))) void _internal_handle_exception(sgx_exception_info_t *info, bool supported)
+/* Begin: Modified by Pinghai */
+/* sgxapp: false -> naive signals like SIGSEGV and SIGKILL; true -> communication signal like SIGALRM and SIGCHLD
+ * The formmer is supported by vallina SGXSDK, the latter is introduced by SGX-DBI
+ */
+extern "C" __attribute__((regparm(1))) void _internal_handle_exception(sgx_exception_info_t *info, bool sgxapp)
 {
     int status = EXCEPTION_CONTINUE_SEARCH;
     handler_node_t *node = NULL;
@@ -285,7 +288,7 @@ extern "C" __attribute__((regparm(1))) void _internal_handle_exception(sgx_excep
     }
 
     //instruction triggering the exception will be executed again.
-    if (supported)
+    if (!sgxapp)
         continue_execution(info);
 
 failed_end:
@@ -293,16 +296,17 @@ failed_end:
     abort();    // throw abortion
 }
 
-
+/* Begin: Added by Pinghai */
 extern "C" __attribute__((regparm(1))) void internal_handle_exception(sgx_exception_info_t *info)
-{
-    _internal_handle_exception(info, true);
-}
-
-extern "C" __attribute__((regparm(1))) void internal_handle_exception_ext(sgx_exception_info_t *info)
 {
     _internal_handle_exception(info, false);
 }
+
+extern "C" __attribute__((regparm(1))) void internal_handle_sgxapp_signal(sgx_exception_info_t *info)
+{
+    _internal_handle_exception(info, true);
+}
+/* End: Added by Pinghai */
 
 static int expand_stack_by_pages(void *start_addr, size_t page_count)
 {
@@ -447,7 +451,7 @@ extern "C" sgx_status_t trts_handle_exception(void *tcs, void *ms)
     if (ssa_gpr->exit_info.valid == 1)
         ssa_gpr->REG(ip) = (size_t)internal_handle_exception; // prepare the ip for 2nd phrase handling
     else
-        ssa_gpr->REG(ip) = (size_t)internal_handle_exception_ext; // The signal is triggered by App's code?
+        ssa_gpr->REG(ip) = (size_t)internal_handle_sgxapp_signal; // The signal is triggered by App's code?
     ssa_gpr->REG(sp) = (size_t)new_sp;      // new stack for internal_handle_exception
     ssa_gpr->REG(ax) = (size_t)info;        // 1st parameter (info) for LINUX32
     ssa_gpr->REG(di) = (size_t)info;        // 1st parameter (info) for LINUX64, LINUX32 also uses it while restoring the context
@@ -463,8 +467,9 @@ default_handler:
     return SGX_ERROR_ENCLAVE_CRASHED;
 }
 
+/* Begin: Added by Pinghai */
 /* exception triggered when running out-sgx code */
-extern "C" sgx_status_t trts_handle_exception_ext(void *tcs, void *ms)
+extern "C" sgx_status_t trts_handle_sgxapp_signal(void *tcs, void *ms)
 {
     thread_data_t *thread_data = get_thread_data();
 
@@ -559,7 +564,7 @@ extern "C" sgx_status_t trts_handle_exception_ext(void *tcs, void *ms)
             return SGX_ERROR_STACK_OVERRUN;
         }
     }
-
+	/* End: Added by Pinghai */
     // initialize the info with SSA[0]
     info->exception_vector = (sgx_exception_vector_t)ssa_gpr->exit_info.vector;
     info->exception_type = (sgx_exception_type_t)ssa_gpr->exit_info.exit_type;
@@ -586,7 +591,7 @@ extern "C" sgx_status_t trts_handle_exception_ext(void *tcs, void *ms)
 #endif
     info->sigcxt_pkg = ms;
 
-    internal_handle_exception_ext(info);
+    internal_handle_sgxapp_signal(info);
 
     return SGX_SUCCESS;
 

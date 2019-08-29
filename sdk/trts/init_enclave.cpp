@@ -54,10 +54,14 @@ uint64_t g_cpu_feature_indicator = 0;
 int EDMM_supported = 0;
 sdk_version_t g_sdk_version = SDK_VERSION_1_5;
 
+/* Begin: Modified by Pinghai */
 const volatile global_data_t g_global_data = {1, 2, 3, 4, 0, 0, 0, 0,
    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, {0, 0, 0, 0, 0, 0}, 0, NULL, NULL, NULL}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 0, 0, {{{0, 0, 0, 0, 0, 0, 0}}}};
+/* End: Modified by Pinghai */
 uint32_t g_enclave_state = ENCLAVE_INIT_NOT_STARTED;
+/* Begin: Added by Pinghai */
 void* g_enclave_image_base = NULL;
+/* End: Added by Pinghai */
 
 extern "C" {
 uintptr_t __stack_chk_guard = 0;
@@ -186,7 +190,9 @@ sgx_status_t do_init_enclave(void *ms, void *tcs)
     }
 
     g_enclave_state = ENCLAVE_INIT_DONE;
+	/* Begin: Added by Pinghai */
     g_enclave_image_base = enclave_base;
+	/* End: Added by Pinghai */
     return SGX_SUCCESS;
 }
 

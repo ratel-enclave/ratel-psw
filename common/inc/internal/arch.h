@@ -167,7 +167,9 @@ typedef uint64_t si_flags_t;
 #define SI_FLAGS_R                  (SI_FLAG_R|SI_FLAG_REG)
 #define SI_FLAGS_RW                 (SI_FLAG_R|SI_FLAG_W|SI_FLAG_REG)
 #define SI_FLAGS_RX                 (SI_FLAG_R|SI_FLAG_X|SI_FLAG_REG)
+/* Begin: Added by Pinghai */
 #define SI_FLAGS_RWX                (SI_FLAGS_RW|SI_FLAGS_RX)
+/* End: Added by Pinghai */
 #define SI_FLAGS_TCS                (SI_FLAG_TCS)
 #define SI_FLAGS_SECS               (SI_FLAG_SECS)
 #define SI_MASK_TCS                 (SI_FLAG_PT_MASK)

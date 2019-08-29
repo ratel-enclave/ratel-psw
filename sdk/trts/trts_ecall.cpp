@@ -267,6 +267,7 @@ static bool is_utility_thread()
     }
 }
 
+/* Begin: Added by Pinghai */
 static void _init_master_thread_data(void* tcs, thread_data_t *td)
 {
     size_t stack_guard = td->stack_guard;
@@ -301,7 +302,7 @@ extern "C" void init_slave_thread_data(thread_data_t* td)
     td->self_addr = (sys_word_t)td;
     td->master_tls_segment = 0; /* false */
 }
-
+/* End: Added by Pinghai */
 
 sgx_status_t do_init_thread(void *tcs)
 {
@@ -314,7 +315,9 @@ sgx_status_t do_init_thread(void *tcs)
     bool thread_first_init = (saved_stack_commit_addr == 0) ? true : false;
 #endif
 
+	/* Begin: Modified by Pinghai */
     _init_master_thread_data(tcs, thread_data);
+	/* End: Modified by Pinghai */
 
 #ifndef SE_SIM
     if (EDMM_supported && is_dynamic_thread(tcs))

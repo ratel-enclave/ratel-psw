@@ -119,7 +119,6 @@ static sgx_status_t get_metadata(BinParser *parser, const int debug, metadata_t 
 #endif
 
     //scan multiple metadata list in sgx_metadata section
-    YPHPRINT("scan multiple metadata list in sgx_metadata section");
     meta_rva = parser->get_metadata_offset();
     do {
         *metadata = GET_PTR(metadata_t, base_addr, meta_rva);
@@ -189,7 +188,6 @@ static int __create_enclave(BinParser &parser, uint8_t* base_addr, const metadat
     // After enclave is created, "parser" and "loader" are not needed any more.
     debug_enclave_info_t *debug_info = NULL;
     int ret = SGX_SUCCESS;
-    YPHPRINT("Begin: create CLoader && ->CLoader::load_enclave_ex() to build the enclave image");
     CLoader loader(base_addr, parser);
 
     ret = loader.load_enclave_ex(lc, debug, metadata, prd_css_file, misc_attr);
@@ -213,7 +211,6 @@ static int __create_enclave(BinParser &parser, uint8_t* base_addr, const metadat
         enclave_version = SDK_VERSION_2_0;
     }
 
-    YPHPRINT("->CEnclave::initialize(), EINIT the enclave? No, ecall(ECMD_INIT_ENCLAVE, ...)");
     // initialize the enclave object
     ret = enclave->initialize(file,
                               loader.get_enclave_id(),
@@ -240,7 +237,6 @@ static int __create_enclave(BinParser &parser, uint8_t* base_addr, const metadat
 
     //add enclave to enclave pool before init_enclave because in simualtion
     //mode init_enclave will rely on CEnclavePool to get Enclave instance.
-    YPHPRINT("->->CEnclavePool::add_enclave() add enclave to enclave pool for management?");
     if (FALSE == CEnclavePool::instance()->add_enclave(enclave))
     {
         loader.destroy_enclave();
@@ -248,7 +244,6 @@ static int __create_enclave(BinParser &parser, uint8_t* base_addr, const metadat
         return SGX_ERROR_UNEXPECTED;
     }
 
-    YPHPRINT("->CEnclave::add_thread(), add TCS pages to enclave? No, just for management");
     std::vector<std::pair<tcs_t *, bool>> tcs_list = loader.get_tcs_list();
     for (unsigned idx = 0; idx < tcs_list.size(); ++idx)
     {
@@ -319,7 +314,6 @@ static int __create_enclave(BinParser &parser, uint8_t* base_addr, const metadat
     //generate load debug event after EINIT
     generate_enclave_debug_event(URTS_EXCEPTION_POSTINITENCLAVE, debug_info);
 
-    YPHPRINT("->CLoader::post_init_action_commit(), do something if CPU supports EDMM");
     if (get_enclave_creator()->is_EDMM_supported(loader.get_enclave_id()))
     {
         layout_t *layout_start = GET_PTR(layout_t, metadata, metadata->dirs[DIR_LAYOUT].offset);
@@ -335,7 +329,6 @@ static int __create_enclave(BinParser &parser, uint8_t* base_addr, const metadat
     }
 
     //call trts to do some intialization
-    YPHPRINT("->EnclaveCreatorHW::initialize() EINIT the enclave?");
     if(SGX_SUCCESS != (ret = get_enclave_creator()->initialize(loader.get_enclave_id())))
     {
         sgx_status_t status = SGX_SUCCESS;
@@ -344,7 +337,6 @@ static int __create_enclave(BinParser &parser, uint8_t* base_addr, const metadat
         goto fail;
     }
 
-    YPHPRINT("If CPU supports EDMM, ->CLoader::post_init_action_commit() do something ");
     if (get_enclave_creator()->is_EDMM_supported(loader.get_enclave_id()))
     {
 
@@ -361,7 +353,6 @@ static int __create_enclave(BinParser &parser, uint8_t* base_addr, const metadat
     }
 
     //fill tcs mini pool
-    YPHPRINT("If CPU supports EDMM, ->CEnclave::fill_tcs_mini_pool_fn() to dynamically add TCS");
     if (get_enclave_creator()->is_EDMM_supported(loader.get_enclave_id()))
     {
         ret = enclave->fill_tcs_mini_pool_fn();
@@ -374,8 +365,7 @@ static int __create_enclave(BinParser &parser, uint8_t* base_addr, const metadat
             goto fail;
         }
     }
-
-    YPHPRINT("->CLoader::set_memory_protection(true)  why set memory protection after initialize? Because after relocation make some Writable pages Read only? YES");
+        
     if(SGX_SUCCESS != (ret = loader.set_memory_protection(true)))
     {
         sgx_status_t status = SGX_SUCCESS;
@@ -384,7 +374,6 @@ static int __create_enclave(BinParser &parser, uint8_t* base_addr, const metadat
         goto fail;
     }
 
-    YPHPRINT("End");
     *enclave_id = loader.get_enclave_id();
     return SGX_SUCCESS;
 
@@ -414,12 +403,10 @@ sgx_status_t _create_enclave(const bool debug, se_file_handle_t pfile, se_file_t
         return (sgx_status_t)ret;
 #endif
 
-    YPHPRINT("->map_file(), mmap the target file into memory");
     mh = map_file(pfile, &file_size);
     if (!mh)
         return SGX_ERROR_OUT_OF_MEMORY;
 
-    YPHPRINT("create parser && invoke PARSER::run_parser() to parse the target file");
     PARSER parser(const_cast<uint8_t *>(mh->base_addr), (uint64_t)(file_size));
     if(SGX_SUCCESS != (ret = parser.run_parser()))
     {
@@ -433,7 +420,6 @@ sgx_status_t _create_enclave(const bool debug, se_file_handle_t pfile, se_file_t
         goto clean_return;
     }
 
-    YPHPRINT("->get_metadata() get metadata from target file");
     if(SGX_SUCCESS != (ret = get_metadata(&parser, debug,  &metadata, &sgx_misc_attr)))
     {
         goto clean_return;
@@ -462,7 +448,6 @@ sgx_status_t _create_enclave(const bool debug, se_file_handle_t pfile, se_file_t
 
 
     //Need to set the whole misc_attr instead of just secs_attr.
-    YPHPRINT("->__create_enclave() on parser, invoke the workhorse");
     do {
         ret = __create_enclave(parser, mh->base_addr, metadata, file, debug, lc, prd_css_file, enclave_id,
                                misc_attr);
@@ -489,7 +474,6 @@ sgx_status_t _create_enclave(const bool debug, se_file_handle_t pfile, se_file_t
 
 
 clean_return:
-    YPHPRINT("->unmap_file() the target file and return");
     if(mh != NULL)
         unmap_file(mh);
     if(lc != NULL)

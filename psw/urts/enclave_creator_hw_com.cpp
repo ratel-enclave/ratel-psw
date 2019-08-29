@@ -66,7 +66,6 @@ int EnclaveCreatorHW::initialize(sgx_enclave_id_t enclave_id)
             info.system_feature_set[0] |= EDMM_ENABLE_BIT;
 
 
-    YPHPRINT("->CEnclave::ecall(ECMD_INIT_ENCLAVE, ...) ");
     int status = enclave->ecall(ECMD_INIT_ENCLAVE, NULL, reinterpret_cast<void *>(&info));
     //free the tcs used by initialization;
     enclave->get_thread_pool()->reset();

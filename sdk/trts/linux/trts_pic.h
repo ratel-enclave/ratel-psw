@@ -67,9 +67,11 @@
 #define xsave_size          (SE_WORDSIZE * 7)
 #define self_addr           0
 #define stack_guard         (SE_WORDSIZE * 5)
+/* Begin: Added by Pinghai */
 #define master_flag			(SE_WORDSIZE *20)
 #define fsbase				(SE_WORDSIZE *21)
 #define gsbase				(SE_WORDSIZE *22)
+/* End: Added by Pinghai */
 
 /* SSA GPR */
 #define ssa_sp_t            32
@@ -103,11 +105,13 @@
 
 #else /* SE_SIM */
 
+/* Begin: Modified by Pinghai */
 #if defined(LINUX32)
     mov     %gs:\offset, %xax
 #elif defined(LINUX64)
     mov     %fs:\offset, %xax
 #endif
+/* End: Modified by Pinghai */
 
 #endif /* !SE_SIM */
 .endm
@@ -117,7 +121,7 @@
     sub      $SE_GUARD_PAGE_SIZE, %xax
 .endm
 
-
+/* Begin: Added by Pinghai */
 .macro PUSH_GPR
     push    %xax
     push    %xdi
@@ -138,4 +142,5 @@
     pop    %xdi
     pop    %xax
 .endm
+/* End: Added by Pinghai */
 

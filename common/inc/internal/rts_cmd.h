@@ -34,7 +34,9 @@
 #define ECMD_INIT_ENCLAVE   -1
 #define ECMD_ORET           -2
 #define ECMD_EXCEPT         -3
+/* Begin: Added by Pinghai */
 #define ECMD_SIGNAL         -4
+/* End: Added by Pinghai */
 #define ECMD_MKTCS          -5
 #define ECMD_UNINIT_ENCLAVE -6
 
