@@ -319,6 +319,16 @@ static int expand_stack_by_pages(void *start_addr, size_t page_count)
     return ret;
 }
 
+
+/* Begin: Added by Pinghai */
+/* A package stores all contxt information, compatible with DynamoRIO's sigframe_rt_t */
+typedef struct _sigcxt_pkg_t {
+    int             signum;
+    ucontext_t      ctx;
+    siginfo_t       info;
+}sigcxt_pkg_t;
+/* End: Added by Pinghai */
+
 // trts_handle_exception(void *tcs)
 //      the entry point for the exceptoin handling
 // Parameter
@@ -332,6 +342,7 @@ extern "C" sgx_status_t trts_handle_exception(void *tcs, void *ms)
 
     ssa_gpr_t *ssa_gpr = NULL;
     sgx_exception_info_t *info = NULL;
+    sigcxt_pkg_t *pkg = NULL;
     uintptr_t sp, *new_sp = NULL;
     size_t size = 0;
 
@@ -445,7 +456,7 @@ extern "C" sgx_status_t trts_handle_exception(void *tcs, void *ms)
     info->cpu_context.r14 = ssa_gpr->r14;
     info->cpu_context.r15 = ssa_gpr->r15;
 #endif
-    info->sigcxt_pkg = ms;
+    info->sigcxt_pkg = pkg;
 
     new_sp = (uintptr_t *)sp;
     if (ssa_gpr->exit_info.valid == 1)
@@ -475,6 +486,7 @@ extern "C" sgx_status_t trts_handle_sgxapp_signal(void *tcs, void *ms)
 
     ssa_gpr_t *ssa_gpr = NULL;
     sgx_exception_info_t *info = NULL;
+    sigcxt_pkg_t *pkg = (sigcxt_pkg_t*)ms;
     uintptr_t sp;
     size_t size = 0;
 
@@ -582,7 +594,7 @@ extern "C" sgx_status_t trts_handle_sgxapp_signal(void *tcs, void *ms)
     info->cpu_context.r14 = ssa_gpr->r14;
     info->cpu_context.r15 = ssa_gpr->r15;
 #endif
-    info->sigcxt_pkg = ms;
+    info->sigcxt_pkg = pkg;
 
     internal_handle_sgxapp_signal(info);
 
