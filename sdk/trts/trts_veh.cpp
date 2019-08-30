@@ -477,7 +477,6 @@ extern "C" sgx_status_t trts_handle_sgxapp_signal(void *tcs, void *ms)
     sgx_exception_info_t *info = NULL;
     uintptr_t sp;
     size_t size = 0;
-    int signum = *(int*)ms;
 
     if (tcs == NULL)
         goto default_handler;
@@ -494,12 +493,6 @@ extern "C" sgx_status_t trts_handle_sgxapp_signal(void *tcs, void *ms)
 
     if ((TD2TCS(thread_data) != tcs) ||
             (((thread_data->first_ssa_gpr)&(~0xfff)) - SE_PAGE_SIZE) != (uintptr_t)tcs) {
-        goto default_handler;
-    }
-
-    if (signum == SIGILL || signum == SIGABRT || signum == SIGSEGV ||
-            signum == SIGBUS || signum == SIGSYS || signum == SIGTRAP ||
-            signum == SIGFPE) {
         goto default_handler;
     }
 
