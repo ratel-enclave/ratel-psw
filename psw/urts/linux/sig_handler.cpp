@@ -91,22 +91,10 @@ static bool sgxapp_sigact[_NSIG];   // sgx-app register signal handlers?
 /* End: Modified by pinghai */
 
 /* Begin: Added by Pinghai */
-/* A variant of kernel_ucontext_t */
-typedef struct _sigctx_knl_t {
-    unsigned long   uc_flags;
-    ucontext        *uc_link;
-    stack_t     uc_stack;
-    mcontext_t  uc_mcontext;
-    unsigned long   sig;
-}sigctx_knl_t;
-
 /* A package stores all contxt information, compatible with DynamoRIO's sigframe_rt_t */
 typedef struct _sigcxt_pkg_t {
-    union {
-        char    *pretcode;
-        int     signum;
-    };
-    sigctx_knl_t    ctx;
+    int             signum;
+    ucontext_t      ctx;
     siginfo_t       info;
 }sigcxt_pkg_t;
 /* End: Added by Pinghai */
