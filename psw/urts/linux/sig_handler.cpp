@@ -164,7 +164,7 @@ void master_sig_handler(int signum, siginfo_t* siginfo, void *priv)
     size_t xbx = context->uc_mcontext.gregs[REG_XBX];
 #endif
     ecall_param_t *param = ECALL_PARAM;
-    sigcxt_pkg_t  pkg;
+    sigcxt_pkg_t  *pkg;
 
     if (xip == get_aep()) {
         //the case of exception on ERESUME or within enclave.
@@ -180,12 +180,13 @@ void master_sig_handler(int signum, siginfo_t* siginfo, void *priv)
             assert(reinterpret_cast<tcs_t *>(xbx) == param->tcs);
             CEnclave *enclave = param->trust_thread->get_enclave();
             /* Begin: Added by Pinghai */
-            pkg.signum = signum;
-            memcpy(&pkg.info, siginfo, sizeof(siginfo_t));
-            memcpy(&pkg.ctx, context, sizeof(ucontext_t));
+            pkg = new sigcxt_pkg_t; // fix-me: please free it!
+            pkg->signum = signum;
+            memcpy(&pkg->info, siginfo, sizeof(siginfo_t));
+            memcpy(&pkg->ctx, context, sizeof(ucontext_t));
             /* End: Added by Pinghai */
 
-            unsigned int ret = enclave->ecall(ECMD_EXCEPT, param->ocall_table, &pkg);
+            unsigned int ret = enclave->ecall(ECMD_EXCEPT, param->ocall_table, pkg);
 
 
             if(SGX_SUCCESS == ret)
@@ -250,10 +251,11 @@ void master_sig_handler(int signum, siginfo_t* siginfo, void *priv)
 
             // Give sgx-app prior to deal with signals
             if (sgxapp_sigact[signum]) {
-                pkg.signum = signum;
-                memcpy(&pkg.info, siginfo, sizeof(siginfo_t));
-                memcpy(&pkg.ctx, context, sizeof(ucontext_t));
-                bStop = hand_signal_inside_sgx(param, &pkg);
+                pkg = new sigcxt_pkg_t;
+                pkg->signum = signum;
+                memcpy(&pkg->info, siginfo, sizeof(siginfo_t));
+                memcpy(&pkg->ctx, context, sizeof(ucontext_t));
+                bStop = hand_signal_inside_sgx(param, pkg);
             }
 
             if (!bStop)
