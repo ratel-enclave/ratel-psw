@@ -181,8 +181,8 @@ void master_sig_handler(int signum, siginfo_t* siginfo, void *priv)
             CEnclave *enclave = param->trust_thread->get_enclave();
             /* Begin: Added by Pinghai */
             pkg.signum = signum;
-            pkg.info = *siginfo;
-            pkg.ctx = *context;
+            memcpy(&pkg.info, siginfo, sizeof(siginfo_t));
+            memcpy(&pkg.ctx, context, sizeof(ucontext_t));
             /* End: Added by Pinghai */
 
             unsigned int ret = enclave->ecall(ECMD_EXCEPT, param->ocall_table, &pkg);
@@ -251,8 +251,8 @@ void master_sig_handler(int signum, siginfo_t* siginfo, void *priv)
             // Give sgx-app prior to deal with signals
             if (sgxapp_sigact[signum]) {
                 pkg.signum = signum;
-                pkg.info = *siginfo;
-                pkg.ctx = *context;
+                memcpy(&pkg.info, siginfo, sizeof(siginfo_t));
+                memcpy(&pkg.ctx, context, sizeof(ucontext_t));
                 bStop = hand_signal_inside_sgx(param, &pkg);
             }
 
