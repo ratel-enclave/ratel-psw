@@ -288,8 +288,7 @@ extern "C" __attribute__((regparm(1))) void _internal_handle_exception(sgx_excep
     }
 
     //instruction triggering the exception will be executed again.
-    if (!sgxapp)
-        continue_execution(info);
+    continue_execution(info);
 
 failed_end:
     thread_data->exception_flag = -1; // mark the current exception cannot be handled
