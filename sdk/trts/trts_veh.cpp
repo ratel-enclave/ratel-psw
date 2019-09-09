@@ -345,6 +345,7 @@ typedef struct _sigcxt_pkg_t
     char info[128];
 } sigcxt_pkg_t;
 
+#define SIGCONTEXT_RSP_INDEX 15
 #define SIGCONTEXT_RIP_INDEX 16
 /* End: Added by Pinghai */
 
@@ -483,6 +484,7 @@ trts_handle_exception(void *tcs, void *ms)
     }
     else {
         sigcxt_pkg_t *pkg = (sigcxt_pkg_t*)(info->sigcxt_pkg);
+        pkg->ctx.uc_mcontext.gregs[SIGCONTEXT_RSP_INDEX] = ssa_gpr->REG(sp);
         pkg->ctx.uc_mcontext.gregs[SIGCONTEXT_RIP_INDEX] = ssa_gpr->REG(ip);
         ssa_gpr->REG(ip) = (size_t)internal_handle_sgxapp_signal; // The signal is triggered by App's code?
     }
