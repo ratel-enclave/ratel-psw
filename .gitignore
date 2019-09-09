@@ -17,3 +17,5 @@
 #output files
 /build/
 /linux/installer/bin/*.bin
+
+.vscode
