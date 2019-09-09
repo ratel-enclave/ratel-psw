@@ -208,6 +208,7 @@ extern "C" __attribute__((regparm(1))) void _internal_handle_exception(sgx_excep
     uintptr_t *nhead = NULL;
     uintptr_t *ntmp = NULL;
     uintptr_t xsp = 0;
+    (void)sgxapp;
 
     if (thread_data->exception_flag < 0)
         goto failed_end;
