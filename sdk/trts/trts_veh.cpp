@@ -318,6 +318,34 @@ static int expand_stack_by_pages(void *start_addr, size_t page_count)
     return ret;
 }
 
+/* Begin: Added by Pinghai */
+/* A package stores all contxt information, compatible with DynamoRIO's sigframe_rt_t */
+typedef struct _mcontext_t
+{
+    long long gregs[23];
+    char fpregs[8];
+    unsigned long long __reserved1[8];
+} mcontext_t;
+
+typedef struct _ucontext_t
+{
+    unsigned long uc_flags;
+    struct _ucontext_t *uc_link;
+    char uc_stack[24];
+    mcontext_t uc_mcontext;
+    char uc_sigmask[128];
+    char __fpregs_mem[512];
+} ucontext_t;
+
+typedef struct _sigcxt_pkg_t
+{
+    int signum;
+    ucontext_t ctx;
+    char info[128];
+} sigcxt_pkg_t;
+
+#define SIGCONTEXT_RIP_INDEX 16
+/* End: Added by Pinghai */
 
 // trts_handle_exception(void *tcs)
 //      the entry point for the exceptoin handling
@@ -326,7 +354,8 @@ static int expand_stack_by_pages(void *start_addr, size_t page_count)
 // Return Value
 //      none zero - success
 //              0 - fail
-extern "C" sgx_status_t trts_handle_exception(void *tcs, void *ms)
+extern "C" sgx_status_t
+trts_handle_exception(void *tcs, void *ms)
 {
     thread_data_t *thread_data = get_thread_data();
 
@@ -448,10 +477,14 @@ extern "C" sgx_status_t trts_handle_exception(void *tcs, void *ms)
     info->sigcxt_pkg = ms;
 
     new_sp = (uintptr_t *)sp;
-    if (ssa_gpr->exit_info.valid == 1)
+    if (ssa_gpr->exit_info.valid == 1) {
         ssa_gpr->REG(ip) = (size_t)internal_handle_exception; // prepare the ip for 2nd phrase handling
-    else
+    }
+    else {
+        sigcxt_pkg_t *pkg = (sigcxt_pkg_t*)(info->sigcxt_pkg);
+        pkg->ctx.uc_mcontext.gregs[SIGCONTEXT_RIP_INDEX] = ssa_gpr->REG(ip);
         ssa_gpr->REG(ip) = (size_t)internal_handle_sgxapp_signal; // The signal is triggered by App's code?
+    }
     ssa_gpr->REG(sp) = (size_t)new_sp;      // new stack for internal_handle_exception
     ssa_gpr->REG(ax) = (size_t)info;        // 1st parameter (info) for LINUX32
     ssa_gpr->REG(di) = (size_t)info;        // 1st parameter (info) for LINUX64, LINUX32 also uses it while restoring the context
