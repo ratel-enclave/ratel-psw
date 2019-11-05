@@ -38,6 +38,7 @@
 
 #include "sgx_trts_exception.h"
 #include <stdlib.h>
+#include <string.h>
 #include "sgx_trts.h"
 #include "xsave.h"
 #include "arch.h"
@@ -297,29 +298,6 @@ failed_end:
 }
 
 /* Begin: Added by Pinghai */
-extern "C" __attribute__((regparm(1))) void internal_handle_exception(sgx_exception_info_t *info)
-{
-    _internal_handle_exception(info, false);
-}
-
-extern "C" __attribute__((regparm(1))) void internal_handle_sgxapp_signal(sgx_exception_info_t *info)
-{
-    _internal_handle_exception(info, true);
-}
-/* End: Added by Pinghai */
-
-static int expand_stack_by_pages(void *start_addr, size_t page_count)
-{
-    int ret = -1;
-
-    if ((start_addr == NULL) || (page_count == 0))
-        return -1;
-
-    ret = apply_pages_within_exception(start_addr, page_count);
-    return ret;
-}
-
-/* Begin: Added by Pinghai */
 /* A package stores all contxt information, compatible with DynamoRIO's sigframe_rt_t */
 typedef struct _mcontext_t
 {
@@ -345,9 +323,72 @@ typedef struct _sigcxt_pkg_t
     char info[128];
 } sigcxt_pkg_t;
 
-#define SIGCONTEXT_RSP_INDEX 15
-#define SIGCONTEXT_RIP_INDEX 16
+/* refer to struct _kernel_sigcontext_t */
+#define SIGCXT_R8 0
+#define SIGCXT_R9 1
+#define SIGCXT_R10 2
+#define SIGCXT_R11 3
+#define SIGCXT_R12 4
+#define SIGCXT_R13 5
+#define SIGCXT_R14 6
+#define SIGCXT_R15 7
+#define SIGCXT_RDI 8
+#define SIGCXT_RSI 9
+#define SIGCXT_RBP 10
+#define SIGCXT_RBX 11
+#define SIGCXT_RDX 12
+#define SIGCXT_RAX 13
+#define SIGCXT_RCX 14
+#define SIGCXT_RSP 15
+#define SIGCXT_RIP 16
+
+extern "C" __attribute__((regparm(1))) void internal_handle_exception(sgx_exception_info_t *info)
+{
+    _internal_handle_exception(info, false);
+}
+
+extern "C" __attribute__((regparm(1))) void internal_handle_sgxapp_signal(sgx_exception_info_t *info)
+{
+    /* create an internal copy of the signal framwork and update it */
+    sigcxt_pkg_t *pkg = (sigcxt_pkg_t *)malloc(sizeof(sigcxt_pkg_t));
+
+    memcpy(pkg, info->sigcxt_pkg, sizeof(sigcxt_pkg_t));
+    pkg->ctx.uc_mcontext.gregs[SIGCXT_R8] = info->cpu_context.REG(8);
+    pkg->ctx.uc_mcontext.gregs[SIGCXT_R9] = info->cpu_context.REG(9);
+    pkg->ctx.uc_mcontext.gregs[SIGCXT_R10] = info->cpu_context.REG(10);
+    pkg->ctx.uc_mcontext.gregs[SIGCXT_R11] = info->cpu_context.REG(11);
+    pkg->ctx.uc_mcontext.gregs[SIGCXT_R12] = info->cpu_context.REG(12);
+    pkg->ctx.uc_mcontext.gregs[SIGCXT_R13] = info->cpu_context.REG(13);
+    pkg->ctx.uc_mcontext.gregs[SIGCXT_R14] = info->cpu_context.REG(14);
+    pkg->ctx.uc_mcontext.gregs[SIGCXT_R15] = info->cpu_context.REG(15);
+    pkg->ctx.uc_mcontext.gregs[SIGCXT_RDI] = info->cpu_context.REG(di);
+    pkg->ctx.uc_mcontext.gregs[SIGCXT_RSI] = info->cpu_context.REG(si);
+    pkg->ctx.uc_mcontext.gregs[SIGCXT_RBP] = info->cpu_context.REG(bp);
+    pkg->ctx.uc_mcontext.gregs[SIGCXT_RBX] = info->cpu_context.REG(bx);
+    pkg->ctx.uc_mcontext.gregs[SIGCXT_RDX] = info->cpu_context.REG(dx);
+    pkg->ctx.uc_mcontext.gregs[SIGCXT_RAX] = info->cpu_context.REG(ax);
+    pkg->ctx.uc_mcontext.gregs[SIGCXT_RCX] = info->cpu_context.REG(cx);
+    pkg->ctx.uc_mcontext.gregs[SIGCXT_RSP] = info->cpu_context.REG(sp);
+    pkg->ctx.uc_mcontext.gregs[SIGCXT_RIP] = info->cpu_context.REG(ip);
+    pkg->ctx.uc_link = NULL;
+    info->sigcxt_pkg = pkg;
+
+    _internal_handle_exception(info, true);
+
+    delete (pkg);
+}
 /* End: Added by Pinghai */
+
+static int expand_stack_by_pages(void *start_addr, size_t page_count)
+{
+    int ret = -1;
+
+    if ((start_addr == NULL) || (page_count == 0))
+        return -1;
+
+    ret = apply_pages_within_exception(start_addr, page_count);
+    return ret;
+}
 
 // trts_handle_exception(void *tcs)
 //      the entry point for the exceptoin handling
@@ -360,7 +401,6 @@ extern "C" sgx_status_t
 trts_handle_exception(void *tcs, void *ms)
 {
     thread_data_t *thread_data = get_thread_data();
-
     ssa_gpr_t *ssa_gpr = NULL;
     sgx_exception_info_t *info = NULL;
     uintptr_t sp, *new_sp = NULL;
@@ -446,11 +486,13 @@ trts_handle_exception(void *tcs, void *ms)
         }
     }
 
-
-    // if(ssa_gpr->exit_info.valid != 1)
-    // {   // exception handlers are not allowed to call in a non-exception state
-    //     goto default_handler;
-    // }
+    /* exception handlers are not allowed:
+    A: to call in a non-exception state, and
+    B: no additional exception handler */
+    if (ssa_gpr->exit_info.valid != 1 && g_first_node == NULL)
+    {
+        goto default_handler;
+    }
 
     // initialize the info with SSA[0]
     info->exception_vector = (sgx_exception_vector_t)ssa_gpr->exit_info.vector;
@@ -479,15 +521,17 @@ trts_handle_exception(void *tcs, void *ms)
     info->sigcxt_pkg = ms;
 
     new_sp = (uintptr_t *)sp;
-    if (ssa_gpr->exit_info.valid == 1) {
+    if (ssa_gpr->exit_info.valid == 1)
+    {
         ssa_gpr->REG(ip) = (size_t)internal_handle_exception; // prepare the ip for 2nd phrase handling
     }
-    else {
-        sigcxt_pkg_t *pkg = (sigcxt_pkg_t*)(info->sigcxt_pkg);
-        pkg->ctx.uc_mcontext.gregs[SIGCONTEXT_RSP_INDEX] = ssa_gpr->REG(sp);
-        pkg->ctx.uc_mcontext.gregs[SIGCONTEXT_RIP_INDEX] = ssa_gpr->REG(ip);
+
+    /* Give high privilege to SGX-DBI if it has registered signal handlers */
+    if (g_first_node != NULL)
+    {
         ssa_gpr->REG(ip) = (size_t)internal_handle_sgxapp_signal; // The signal is triggered by App's code?
     }
+
     ssa_gpr->REG(sp) = (size_t)new_sp;      // new stack for internal_handle_exception
     ssa_gpr->REG(ax) = (size_t)info;        // 1st parameter (info) for LINUX32
     ssa_gpr->REG(di) = (size_t)info;        // 1st parameter (info) for LINUX64, LINUX32 also uses it while restoring the context
@@ -507,6 +551,12 @@ default_handler:
 /* exception triggered when running out-sgx code */
 extern "C" sgx_status_t trts_handle_sgxapp_signal(void *tcs, void *ms)
 {
+    // Inject a signal framework on dynamorio's signal stack
+    // 1. Get dynamorio's signal stack
+    // 2. Inject the signal frame in that stack
+    // 2. Get the return address of the latest do_ocall
+    // 3. Save the return address to TCS
+    // 4. Replace the return address with address of function switch_stack_call_dr_signal_handler
     thread_data_t *thread_data = get_thread_data();
 
     ssa_gpr_t *ssa_gpr = NULL;

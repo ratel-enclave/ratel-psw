@@ -70,7 +70,7 @@ CEnclave::CEnclave(CLoader &ldr)
 }
 
 
-sgx_status_t CEnclave::initialize(const se_file_t& file, const sgx_enclave_id_t enclave_id, void * const start_addr, const uint64_t enclave_size, 
+sgx_status_t CEnclave::initialize(const se_file_t& file, const sgx_enclave_id_t enclave_id, void * const start_addr, const uint64_t enclave_size,
                                         const uint32_t tcs_policy, const uint32_t enclave_version, const uint32_t tcs_min_pool)
 {
     uint32_t name_len = file.name_len;
@@ -120,7 +120,7 @@ sgx_status_t CEnclave::initialize(const se_file_t& file, const sgx_enclave_id_t 
         m_enclave_info.lpFileName = NULL;
         return SGX_ERROR_INVALID_PARAMETER;
     }
-    
+
     return SGX_SUCCESS;
 }
 
@@ -136,7 +136,7 @@ CEnclave::~CEnclave()
 
     destory_debug_info(&m_enclave_info);
     se_fini_rwlock(&m_rwlock);
-        
+
     se_event_destroy(m_new_thread_event);
     m_new_thread_event = NULL;
 }
@@ -272,7 +272,7 @@ int CEnclave::ocall(const unsigned int proc, const sgx_ocall_table_t *ocall_tabl
         else if ((int)proc == EDMM_MODPR)
             error = ocall_emodpr(ms);
     }
-    else 
+    else
     {
         //validate the proc is within ocall_table;
         if(NULL == ocall_table ||
@@ -315,26 +315,26 @@ CTrustThread * CEnclave::get_tcs(int ecall_cmd)
     return trust_thread;
 }
 
-void *fill_tcs_mini_pool_func(void *args)  
-{  
+void *fill_tcs_mini_pool_func(void *args)
+{
      CEnclave *it = (CEnclave*)(args);
      if(it != NULL)
      {
-        it->fill_tcs_mini_pool(); 
+        it->fill_tcs_mini_pool();
      }
      return NULL;
-} 
+}
 
 sgx_status_t CEnclave::fill_tcs_mini_pool_fn()
 {
     pthread_t tid;
     if(m_pthread_is_valid == false)
     {
-       m_pthread_is_valid = true; 
-       int ret = pthread_create(&tid, NULL, fill_tcs_mini_pool_func, (void *)(this));  
+       m_pthread_is_valid = true;
+       int ret = pthread_create(&tid, NULL, fill_tcs_mini_pool_func, (void *)(this));
         if(ret != 0)
         {
-            m_pthread_is_valid = false; 
+            m_pthread_is_valid = false;
             return SGX_ERROR_UNEXPECTED;
         }
         m_pthread_tid = tid;
@@ -346,7 +346,7 @@ sgx_status_t CEnclave::fill_tcs_mini_pool_fn()
             return SGX_ERROR_UNEXPECTED;
         }
     }
-    
+
 
     return SGX_SUCCESS;
 }
@@ -374,10 +374,10 @@ sgx_status_t CEnclave::fill_tcs_mini_pool()
         else
         {
             return SGX_ERROR_ENCLAVE_LOST;
-        } 
+        }
    }while(se_event_wait(m_new_thread_event) == SE_MUTEX_SUCCESS);
    return SGX_ERROR_UNEXPECTED;
-  
+
 }
 
 void CEnclave::put_tcs(CTrustThread *trust_thread)
@@ -641,7 +641,7 @@ bool CEnclave::update_trust_thread_debug_flag(void* tcs_address, uint8_t debug_f
 
     if(debug_info->enclave_type == ET_DEBUG)
     {
-       
+
          if(!se_write_process_mem(pid, reinterpret_cast<unsigned char *>(tcs_address) + sizeof(uint64_t), &debug_flag2, sizeof(uint64_t), NULL))
               return FALSE;
 
@@ -653,14 +653,22 @@ bool CEnclave::update_trust_thread_debug_flag(void* tcs_address, uint8_t debug_f
 bool CEnclave::update_debug_flag(uint8_t debug_flag)
 {
     debug_tcs_info_t* tcs_list_entry = m_enclave_info.tcs_list;
-    
+
     while(tcs_list_entry)
     {
          if(!update_trust_thread_debug_flag(tcs_list_entry->TCS_address, debug_flag))
               return FALSE;
 
-         tcs_list_entry = tcs_list_entry->next_tcs_info;     
+         tcs_list_entry = tcs_list_entry->next_tcs_info;
     }
 
     return TRUE;
+}
+
+/* Begin: Added by Pinghai */
+CEnclave *g_DBI_enclave = NULL;
+
+void finalize_DBI_enclave(const sgx_enclave_id_t enclave_id)
+{
+    g_DBI_enclave = CEnclavePool::instance()->ref_enclave(enclave_id);
 }

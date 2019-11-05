@@ -365,7 +365,7 @@ static int __create_enclave(BinParser &parser, uint8_t* base_addr, const metadat
             goto fail;
         }
     }
-        
+
     if(SGX_SUCCESS != (ret = loader.set_memory_protection(true)))
     {
         sgx_status_t status = SGX_SUCCESS;
@@ -504,5 +504,10 @@ extern "C" sgx_status_t sgx_destroy_enclave(const sgx_enclave_id_t enclave_id)
     }
 
     return status;
+}
+
+extern "C" sgx_status_t sgx_destroy_DBI_enclave(const sgx_enclave_id_t enclave_id)
+{
+    return sgx_destroy_enclave(enclave_id);
 }
 #endif

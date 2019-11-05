@@ -40,6 +40,8 @@ void reg_sig_handler(void);
 extern "C" {
 #endif
 
+#include "sgx_eid.h"
+
 // Interface for sgx-app registering signal handlers.
 void sgxapp_reg_sighandler(int signum);
 

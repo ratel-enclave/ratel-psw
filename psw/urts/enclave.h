@@ -124,6 +124,13 @@ private:
     static CEnclavePool                 m_instance;
 };
 
+/* Begin: Added by Pinghai */
+extern CEnclave *g_DBI_enclave;
+// DBI enclave need to deal with signals on behalf of target application.
+void finalize_DBI_enclave(const sgx_enclave_id_t enclave_id);
+
+/* End: Added by Pinghai */
+
 #define AbnormalTermination() (FALSE)
 
 #endif
