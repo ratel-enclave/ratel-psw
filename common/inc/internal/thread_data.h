@@ -117,7 +117,9 @@ typedef struct _thread_data_t
     /*Load them when EENTERing */
     struct _thread_data_t *fsbase;  /* 1. for master fs/gs-segment, always points to current fs/gs-segment */
     struct _thread_data_t *gsbase;  /* 2. for slave fs/gs-segment, always points to master fs/gs-segment */
-	/* End: Added by Pinghai */
+	void    *thread_hcxt;
+    void    *signal_frame;          /* Point to signal frame created inside-SGX */
+    /* End: Added by Pinghai */
 } thread_data_t;
 
 #ifdef __cplusplus

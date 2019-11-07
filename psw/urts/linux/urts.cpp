@@ -74,5 +74,9 @@ extern "C" sgx_status_t sgx_create_enclave(const char *file_name, const int debu
 
 extern "C" sgx_status_t sgx_create_DBI_enclave(const char *file_name, const int debug, sgx_launch_token_t *launch_token, int *launch_token_updated, sgx_enclave_id_t *enclave_id, sgx_misc_attribute_t *misc_attr)
 {
-    return sgx_create_enclave(file_name, debug, launch_token, launch_token_updated, enclave_id, misc_attr);
+    sgx_status_t s;
+    s = sgx_create_enclave(file_name, debug, launch_token, launch_token_updated, enclave_id, misc_attr);
+    finalize_DBI_enclave(*enclave_id);
+
+    return s;
 }
