@@ -269,6 +269,13 @@ extern "C" __attribute__((regparm(1))) void _internal_handle_exception(sgx_excep
     }
     free(nhead);
 
+    /* free the dynamically allocated memory */
+    if (info->sigcxt_pkg != NULL)
+    {
+        free(info->sigcxt_pkg);
+        info->sigcxt_pkg = NULL;
+    }
+
     // call default handler
     // ignore invalid return value, treat to EXCEPTION_CONTINUE_SEARCH
     // check SP to be written on SSA is pointing to the trusted stack
@@ -351,12 +358,13 @@ extern "C" __attribute__((regparm(1))) void internal_handle_exception(sgx_except
 /* Hanlde signals triggerred inside sgx-enclave on behalve of DBI */
 extern "C" __attribute__((regparm(1))) void internal_handle_DBI_signal_in(sgx_exception_info_t *info)
 {
-    /* create an internal copy of the signal framwork and update it */
-    sigcxt_pkg_t *pkg = (sigcxt_pkg_t *)info->sigcxt_pkg;
+    thread_data_t *master_td;
+
+    master_td = get_thread_data();
+    info->sigcxt_pkg = master_td->signal_frame;
+    master_td->signal_frame = NULL;
 
     _internal_handle_exception(info, true);
-
-    delete (pkg);
 }
 /* End: Added by Pinghai */
 
@@ -512,8 +520,11 @@ trts_handle_exception(void *tcs, void *ms)
     if (g_first_node != NULL)
     {
         /* create an internal copy of the signal framwork and update it */
-        sigcxt_pkg_t *pkg = (sigcxt_pkg_t *)malloc(sizeof(sigcxt_pkg_t));
+        thread_data_t *master_td;
+        sigcxt_pkg_t *pkg;
 
+        master_td = get_thread_data();
+        pkg = (sigcxt_pkg_t *)malloc(sizeof(sigcxt_pkg_t));
         memcpy(pkg, info->sigcxt_pkg, sizeof(sigcxt_pkg_t));
         pkg->ctx.uc_mcontext.gregs[SIGCXT_R8] = info->cpu_context.REG(8);
         pkg->ctx.uc_mcontext.gregs[SIGCXT_R9] = info->cpu_context.REG(9);
@@ -533,8 +544,9 @@ trts_handle_exception(void *tcs, void *ms)
         pkg->ctx.uc_mcontext.gregs[SIGCXT_RSP] = info->cpu_context.REG(sp);
         pkg->ctx.uc_mcontext.gregs[SIGCXT_RIP] = info->cpu_context.REG(ip);
         pkg->ctx.uc_link = NULL;
-        info->sigcxt_pkg = pkg;
         ssa_gpr->REG(ip) = (size_t)internal_handle_DBI_signal_in; // The signal is triggered by App's code?
+
+        master_td->signal_frame = pkg;
     }
     /* End: Added by Pinghai */
 
@@ -580,9 +592,12 @@ typedef struct _simu_pt_gregs
 extern "C"
 void internal_handle_DBI_signal_out(simu_pt_gregs *regs)
 {
-    thread_data_t *master_td = get_thread_data();
-    sigcxt_pkg_t *pkg = (sigcxt_pkg_t *)master_td->signal_frame;
     sgx_exception_info_t info;
+    thread_data_t *master_td;
+    sigcxt_pkg_t *pkg;
+
+    master_td = get_thread_data();
+    pkg = (sigcxt_pkg_t *)master_td->signal_frame;
 
     /* update the signal framwork, except rsp and rip */
     pkg->ctx.uc_mcontext.gregs[SIGCXT_R8] = regs->r8;
@@ -601,6 +616,7 @@ void internal_handle_DBI_signal_out(simu_pt_gregs *regs)
     pkg->ctx.uc_mcontext.gregs[SIGCXT_RAX] = regs->rax;
     pkg->ctx.uc_mcontext.gregs[SIGCXT_RCX] = regs->rcx;
     pkg->ctx.uc_link = NULL;
+
 
     /* initialize info */
     info.sigcxt_pkg = pkg;
@@ -626,8 +642,6 @@ void internal_handle_DBI_signal_out(simu_pt_gregs *regs)
 
     master_td->signal_frame = NULL;
    _internal_handle_exception(&info, true);
-
-   delete(pkg);
 }
 
 extern "C"
