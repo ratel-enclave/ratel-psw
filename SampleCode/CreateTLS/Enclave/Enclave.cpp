@@ -41,14 +41,19 @@
  *   Invokes OCALL to display the enclave buffer to the terminal.
  */
 
+#define TLS_TYPE_UNKNOW     0x1      // Use bit 0
+#define TLS_TYPE_TCS_TD     0x2      // Use bit 1
+#define TLS_TYPE_DBI_DR     0x4      // Use bit 2
+#define TLS_TYPE_DBI_APP    0x8      // Use bit 3
+
 extern "C" {
     struct thread_data_t;
-    void init_slave_thread_data(thread_data_t *td);
-    void load_fsbase(unsigned long base);
-    void load_gsbase(unsigned long base);
+    void init_slave_tls(void *tls_segment);
+    void load_segment_fs(void *tls_segment);
+    void load_segment_gs(void *tls_segment);
 };
 
-unsigned long rdgsbase(void)
+unsigned long read_gsbase(void)
 {
     unsigned long gsbase;
 
@@ -56,7 +61,7 @@ unsigned long rdgsbase(void)
     return gsbase;
 }
 
-void wrgsbase(unsigned long gsbase)
+void write_gsbase(unsigned long gsbase)
 {
     asm volatile ( "rdgsbase %0" :"=a" (gsbase));
 }
@@ -81,8 +86,8 @@ void sgx_load_fsbase(void)
     snprintf(buf, BUFSIZ, "%s: create new fs-segment>>>>%lx\n", __FUNCTION__, fsnew);
     ocall_print_string(buf);
 
-    init_slave_thread_data((thread_data_t*)fsnew);
-    load_fsbase(fsnew);
+    init_slave_tls((void*)fsnew);
+    load_segment_fs((void*)fsnew);
     asm volatile ( "rdfsbase %0" : "=a" (fsval));
     snprintf(buf, BUFSIZ, "%s: update fsbase to >>>>%lx\n", __FUNCTION__, fsval);
     ocall_print_string(buf);
@@ -94,8 +99,8 @@ void sgx_load_fsbase(void)
     snprintf(buf, BUFSIZ, "%s: create another new fs-segment>>>>%lx\n", __FUNCTION__, fsnew);
     ocall_print_string(buf);
 
-    init_slave_thread_data((thread_data_t*)fsnew);
-    load_fsbase(fsnew);
+    init_slave_tls((void*)fsnew);
+    load_segment_fs((void*)fsnew);
     asm volatile ( "rdfsbase %0" : "=a" (fsval));
     snprintf(buf, BUFSIZ, "%s: update fsbase to >>>>%lx\n", __FUNCTION__, fsval);
     ocall_print_string(buf);
@@ -105,7 +110,7 @@ void sgx_load_fsbase(void)
     snprintf(buf, BUFSIZ, "%s: load the original fsbase >>>>%lx\n", __FUNCTION__, fsorg);
     ocall_print_string(buf);
 
-    load_fsbase(fsorg);
+    load_segment_fs((void*)fsorg);
     asm volatile ( "rdfsbase %0" : "=a" (fsval));
     snprintf(buf, BUFSIZ, "%s: update fsbase to >>>>%lx\n", __FUNCTION__, fsval);
     ocall_print_string(buf);
@@ -132,8 +137,8 @@ void sgx_load_gsbase(void)
     snprintf(buf, BUFSIZ, "%s: create new gs-segment>>>>%lx\n", __FUNCTION__, fsnew);
     ocall_print_string(buf);
 
-    init_slave_thread_data((thread_data_t*)fsnew);
-    load_gsbase(fsnew);
+    init_slave_tls((void*)fsnew);
+    load_segment_gs((void*)fsnew);
     asm volatile ( "rdgsbase %0" : "=a" (fsval));
     snprintf(buf, BUFSIZ, "%s: update gsbase to >>>>%lx\n", __FUNCTION__, fsval);
     ocall_print_string(buf);
@@ -145,8 +150,8 @@ void sgx_load_gsbase(void)
     snprintf(buf, BUFSIZ, "%s: create another new gs-segment>>>>%lx\n", __FUNCTION__, fsnew);
     ocall_print_string(buf);
 
-    init_slave_thread_data((thread_data_t*)fsnew);
-    load_gsbase(fsnew);
+    init_slave_tls((void*)fsnew);
+    load_segment_gs((void*)fsnew);
     asm volatile ( "rdgsbase %0" : "=a" (fsval));
     snprintf(buf, BUFSIZ, "%s: update gsbase to >>>>%lx\n", __FUNCTION__, fsval);
     ocall_print_string(buf);
@@ -156,7 +161,7 @@ void sgx_load_gsbase(void)
     snprintf(buf, BUFSIZ, "%s: load the original gsbase >>>>%lx\n", __FUNCTION__, fsorg);
     ocall_print_string(buf);
 
-    load_gsbase(fsorg);
+    load_segment_gs((void*)fsorg);
     asm volatile ( "rdgsbase %0" : "=a" (fsval));
     snprintf(buf, BUFSIZ, "%s: update gsbase to >>>>%lx\n", __FUNCTION__, fsval);
     ocall_print_string(buf);
@@ -166,5 +171,4 @@ void sgx_fsgs_info(void)
 {
     sgx_load_fsbase();
     sgx_load_gsbase();
-
 }

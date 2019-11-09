@@ -54,18 +54,19 @@ sgx_status_t sgx_ocall(const unsigned int index, void *ms)
 {
     // sgx_ocall is not allowed during exception handling
     thread_data_t *thread_data = get_thread_data();
-    
+
     // we have exceptions being handled
-    if(thread_data->exception_flag != 0) {
+    if (thread_data->exception_flag != 0)
+    {
         return SGX_ERROR_OCALL_NOT_ALLOWED;
     }
     // the OCALL index should be within the ocall table range
     // -2, -3 and -4 should be allowed to test SDK 2.0 features
-    if((index != 0) &&
-            (index != (unsigned int)EDMM_TRIM) &&
-            (index != (unsigned int)EDMM_TRIM_COMMIT) &&
-            (index != (unsigned int)EDMM_MODPR) &&
-            static_cast<size_t>(index) >= g_dyn_entry_table.nr_ocall)
+    if ((index != 0) &&
+        (index != (unsigned int)EDMM_TRIM) &&
+        (index != (unsigned int)EDMM_TRIM_COMMIT) &&
+        (index != (unsigned int)EDMM_MODPR) &&
+        static_cast<size_t>(index) >= g_dyn_entry_table.nr_ocall)
     {
         return SGX_ERROR_INVALID_FUNCTION;
     }
@@ -76,21 +77,21 @@ sgx_status_t sgx_ocall(const unsigned int index, void *ms)
     return status;
 }
 
+
 extern "C"
 uintptr_t update_ocall_lastsp(ocall_context_t* context)
 {
     thread_data_t* thread_data = get_thread_data();
-
-    uintptr_t last_sp = 0;
-
-    last_sp = thread_data->last_sp;
+    uintptr_t last_sp = thread_data->last_sp;
 
     context->pre_last_sp = last_sp;
 
     if (context->pre_last_sp == thread_data->stack_base_addr)
     {
         context->ocall_depth = 1;
-    } else {
+    }
+    else
+    {
         // thread_data->last_sp is only set when ocall or exception handling occurs
         // ocall is block during exception handling, so last_sp is always ocall frame here
         ocall_context_t* context_pre = reinterpret_cast<ocall_context_t*>(context->pre_last_sp);
@@ -102,17 +103,18 @@ uintptr_t update_ocall_lastsp(ocall_context_t* context)
     return last_sp;
 }
 
+extern "C" void oret_load_slave_tls(void);
 sgx_status_t do_oret(void *ms)
 {
     thread_data_t *thread_data = get_thread_data();
-
     uintptr_t last_sp = thread_data->last_sp;
     ocall_context_t *context = reinterpret_cast<ocall_context_t*>(thread_data->last_sp);
+
     if(0 == last_sp || last_sp <= (uintptr_t)&context)
     {
         return SGX_ERROR_UNEXPECTED;
     }
-    // At least 1 ecall frame and 1 ocall frame are expected on stack. 
+    // At least 1 ecall frame and 1 ocall frame are expected on stack.
     // 30 is an estimated value: 8 for enclave_entry and 22 for do_ocall.
     if(last_sp > thread_data->stack_base_addr - 30 * sizeof(size_t))
     {
@@ -129,8 +131,10 @@ sgx_status_t do_oret(void *ms)
     }
 
     thread_data->last_sp = context->pre_last_sp;
+
+    oret_load_slave_tls();
     asm_oret(last_sp, ms);
-    
+
     // Should not come here
     return SGX_ERROR_UNEXPECTED;
 }

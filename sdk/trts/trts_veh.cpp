@@ -674,7 +674,7 @@ void no_name_function(void)
 }
 
 extern "C" void callwrapper_internal_handle_DBI_signal_out();
-
+extern "C" void oret_load_slave_tls(void);
 /* exception triggered when running out-sgx code */
 extern "C" sgx_status_t trts_handle_DBI_signal(void *tcs, void *ms)
 {
@@ -685,6 +685,7 @@ extern "C" sgx_status_t trts_handle_DBI_signal(void *tcs, void *ms)
     // 3. Save the return address to TCS
     // 4. Replace the return address with address of function switch_stack_call_dr_signal_handler
     thread_data_t *master_td = get_thread_data();
+    ocall_context_t *ocall_cxt;
     uintptr_t *stack_ret;
     sigcxt_pkg_t *pkg;
 
@@ -701,7 +702,8 @@ extern "C" sgx_status_t trts_handle_DBI_signal(void *tcs, void *ms)
         goto default_handler;
 
     /* Refer to trts_pic.S::do_ocall, the ocall consums 0x408 bytes on stack */
-    stack_ret = (uintptr_t*)(master_td->last_sp + 0x408);
+    ocall_cxt = (ocall_context_t*)master_td->last_sp;
+    stack_ret = (uintptr_t*)(ocall_cxt->xbp + sizeof(uintptr_t));
 
     /* create an internal copy of the signal framwork and update it */
     pkg = (sigcxt_pkg_t *)malloc(sizeof(sigcxt_pkg_t));
@@ -712,6 +714,8 @@ extern "C" sgx_status_t trts_handle_DBI_signal(void *tcs, void *ms)
 
     *stack_ret = (uintptr_t)callwrapper_internal_handle_DBI_signal_out;
     master_td->signal_frame = pkg;
+
+    oret_load_slave_tls();
 
     return SGX_SUCCESS;
 

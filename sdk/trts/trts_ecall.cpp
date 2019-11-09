@@ -200,6 +200,8 @@ static void do_del_tcs(void *ptcs)
 static volatile bool           g_is_first_ecall = true;
 static volatile sgx_spinlock_t g_ife_lock       = SGX_SPINLOCK_INITIALIZER;
 
+
+extern "C" void ecall_reset_tls_reg(void);
 typedef sgx_status_t (*ecall_func_t)(void *ms);
 static sgx_status_t trts_ecall(uint32_t ordinal, void *ms)
 {
@@ -244,8 +246,11 @@ static sgx_status_t trts_ecall(uint32_t ordinal, void *ms)
         status = func(ms);
     }
 
+    /* Anyway, the TLS segments should be restored */
+    ecall_reset_tls_reg();
     return status;
 }
+
 
 extern "C" uintptr_t __stack_chk_guard;
 static void init_static_stack_canary(void *tcs)
@@ -268,7 +273,12 @@ static bool is_utility_thread()
 }
 
 /* Begin: Added by Pinghai */
-static void _init_master_thread_data(void* tcs, thread_data_t *td)
+#define TLS_TYPE_UNKNOW     0x1      // Use bit 0
+#define TLS_TYPE_TCS_TD     0x2      // Use bit 1
+#define TLS_TYPE_DBI_DR     0x4      // Use bit 2
+#define TLS_TYPE_DBI_APP    0x8      // Use bit 3
+
+static void init_master_tls(void* tcs, thread_data_t *td)
 {
     size_t stack_guard = td->stack_guard;
     size_t thread_flags = td->flags;
@@ -288,19 +298,20 @@ static void _init_master_thread_data(void* tcs, thread_data_t *td)
     td->flags = thread_flags;
     init_static_stack_canary(tcs);
 
-    td->master_tls_segment = 1; /* true */
-    td->fsbase = td;
-    td->gsbase = td;
+    td->self_addr |= TLS_TYPE_TCS_TD;
+    td->master_tls = td;
+    td->cur_fs_seg = td;
+    td->cur_gs_seg = td;
 }
 
 
-extern "C" void init_slave_thread_data(thread_data_t* td)
+extern "C" void init_slave_tls(void *tls_segment)
 {
-    thread_data_t *td_cur = get_thread_data();
-    assert(td != NULL && td_cur != NULL);
-    *td = *td_cur;
-    td->self_addr = (sys_word_t)td;
-    td->master_tls_segment = 0; /* false */
+    thread_data_t *td_master = get_thread_data();
+    assert(tls_segment != NULL && td_master != NULL);
+
+    thread_data_t *td_slave = (thread_data_t*)tls_segment;
+    td_slave->master_tls = td_master;
 }
 /* End: Added by Pinghai */
 
@@ -316,7 +327,7 @@ sgx_status_t do_init_thread(void *tcs)
 #endif
 
 	/* Begin: Modified by Pinghai */
-    _init_master_thread_data(tcs, thread_data);
+    init_master_tls(tcs, thread_data);
 	/* End: Modified by Pinghai */
 
 #ifndef SE_SIM

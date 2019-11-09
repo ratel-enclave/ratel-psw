@@ -51,9 +51,9 @@
 static void init_stack_guard(void *tcs)
 {
     thread_data_t *thread_data = get_thread_data();
-    if( (NULL == thread_data) || ((thread_data->stack_base_addr == thread_data->last_sp) && (0 != g_global_data.thread_policy)))
+    if ((NULL == thread_data) || ((thread_data->stack_base_addr == thread_data->last_sp) && (0 != g_global_data.thread_policy)))
     {
-         thread_data = GET_PTR(thread_data_t, tcs, g_global_data.td_template.self_addr);
+        thread_data = GET_PTR(thread_data_t, tcs, g_global_data.td_template.self_addr);
     }
     else
     {
@@ -64,100 +64,72 @@ static void init_stack_guard(void *tcs)
 
     size_t tmp_stack_guard = 0;
     if (SGX_SUCCESS != sgx_read_rand(
-                (unsigned char*)&tmp_stack_guard,
-                sizeof(tmp_stack_guard)))
+                           (unsigned char *)&tmp_stack_guard,
+                           sizeof(tmp_stack_guard)))
         abort();
 
     thread_data->stack_guard = tmp_stack_guard;
 }
 
-
 /* Begin: Added by Pinghai */
-//#if defined(LINUX64)
-
 #define UPDATE_FS 10
 #define UPDATE_GS 20
 
-static inline void __propagate_thread_data(thread_data_t* td_new, thread_data_t* td_cur)
-{
-    assert(td_new != NULL && td_cur != NULL);
-    td_new->last_sp = td_cur->last_sp;
-    td_new->first_ssa_gpr = td_cur->first_ssa_gpr;
-    td_new->last_error = td_cur->last_error;
-    td_new->exception_flag = td_cur->exception_flag;
-    td_new->stack_commit_addr = td_cur->stack_commit_addr;
-}
 
-extern "C" {
-
-void load_fsbase(sys_word_t base)
-{
-    thread_data_t *td_new = (thread_data_t*)base;
-    thread_data_t *td_cur = get_thread_data();
-
-    assert (td_new != NULL && td_cur != NULL);
-
-    //The same td instance?
-    if (td_new == td_cur)
-        return;
-
-    __propagate_thread_data(td_new, td_cur);
-
-    thread_data_t *td_master = NULL;
-    if (td_new->master_tls_segment)
-        td_master = td_new;
-    else if (td_cur->master_tls_segment)
-        td_master = td_cur;
-    else
-        td_master = td_cur->fsbase;
-
-    assert (td_master != NULL);
-    td_master->fsbase = td_new;
-    asm volatile ( "wrfsbase %0" :: "a" (td_new) );
-}
-
-
-void load_gsbase(sys_word_t base)
-{
-    thread_data_t *td_new = (thread_data_t*)base;
-    thread_data_t *td_cur = get_thread_data();  /* fs-segmetn */
-
-    assert (td_new != NULL && td_cur != NULL);
-
-
-    thread_data_t *td_master = NULL;
-    if (td_cur->master_tls_segment)
-        td_master = td_cur;
-    else
-        td_master = td_cur->fsbase;
-    assert (td_master != NULL);
-
-    thread_data_t *td_gs = td_master->gsbase;
-
-    //The same td instance?
-    if (td_new == td_gs)
-        return;
-
-    td_master->gsbase = td_new;
-    asm volatile ( "wrgsbase %0" :: "a" (td_new) );
-}
-
-
-void _eenter_load_slave_tls(void)
+extern "C"
+void load_segment_fs(void *tls_segment)
 {
     thread_data_t *td_master = get_thread_data();
+    assert (td_master != NULL);
 
-    /* initialized? */
-    if (td_master == NULL)
+    /* Point to TCS-segment ? */
+    if (tls_segment == td_master)
         return;
 
-    assert(td_master->master_tls_segment == 1);
+    /* Different segments */
+    thread_data_t *td_new = (thread_data_t*)tls_segment;
 
-    thread_data_t *td_fs = td_master->fsbase;
-    thread_data_t *td_gs = td_master->gsbase;
+    td_new->self_addr = (sys_word_t)tls_segment;
+    td_new->master_tls = td_master;
+    td_master->cur_fs_seg = tls_segment;
+
+    asm volatile ( "wrfsbase %0" :: "a" (tls_segment) );
+}
+
+
+extern "C"
+void load_segment_gs(void *tls_segment)
+{
+    thread_data_t *td_master = get_thread_data();
+    assert (td_master != NULL);
+
+    /* Point to TCS-segment ? */
+    if (tls_segment == td_master)
+        return;
+
+    /* Different segments */
+    thread_data_t *td_new = (thread_data_t*)tls_segment;
+
+    td_new->self_addr = (sys_word_t)tls_segment;
+    td_new->master_tls = td_master;
+    td_master->cur_gs_seg = tls_segment;
+    asm volatile ( "wrgsbase %0" :: "a" (tls_segment) );
+}
+
+
+/* Invoked just after every eenter */
+extern "C"
+void oret_load_slave_tls(void)
+{
+    thread_data_t *td_master = get_thread_data();
+    assert (td_master != NULL);
+
+    void *td_fs = td_master->cur_fs_seg;
+    void *td_gs = td_master->cur_gs_seg;
     assert(td_fs != NULL);
     assert(td_gs != NULL);
 
+    /* Optimized, skipping execute wrfsbase/wrgsbase if possible */
     if (td_fs != td_master)
         asm volatile ( "wrfsbase %0" :: "a" (td_fs) );
 
@@ -165,30 +137,42 @@ void _eenter_load_slave_tls(void)
         asm volatile ( "wrgsbase %0" :: "a" (td_gs) );
 }
 
-
-void _eexit_update_master_tls(void)
+extern "C"
+void ecall_reset_tls_reg(void)
 {
-    thread_data_t *td = get_thread_data();
-    assert(td != NULL);
+    thread_data_t *td_master = get_thread_data();
+    assert (td_master != NULL);
 
-    if (td->master_tls_segment) {
-        //do nothing
-    }
-    else {
-        //update master tls then load it
-        thread_data_t *td_master = td->fsbase;
-        assert(td_master != NULL);
+    void *td_fs = td_master->cur_fs_seg;
+    void *td_gs = td_master->cur_gs_seg;
 
-        __propagate_thread_data(td_master, td);
-    }
+    if (td_fs != td_master)
+        asm volatile ( "wrfsbase %0" :: "a" (td_master) );
+
+    if (td_gs != td_master)
+        asm volatile ( "wrgsbase %0" :: "a" (td_master) );
 }
 
+
+/* Invoked just before every eexit, compatible with update_ocall_lastsp */
+extern "C" void
+eexit_update_lastsp(void *last_sp)
+{
+    thread_data_t *td_master = get_thread_data();
+    assert(td_master != NULL);
+
+    td_master->last_sp = (sys_word_t)last_sp;
+
+    /* Make sure:
+    td_master->cur_fs_seg = td_fs &&
+    td_master->cur_gs_seg = td_gs
+    */
 }
-//#endif
 /* End: Added by Pinghai */
 
 
-extern "C" int enter_enclave(int index, void *ms, void *tcs, int cssa)
+extern "C"
+int enter_enclave(int index, void *ms, void *tcs, int cssa)
 {
     if(get_enclave_state() == ENCLAVE_CRASHED)
     {

@@ -55,10 +55,13 @@ int EDMM_supported = 0;
 sdk_version_t g_sdk_version = SDK_VERSION_1_5;
 
 /* Begin: Modified by Pinghai */
+/* NULL values corresponding to master_tls -> signal_frame */
 const volatile global_data_t g_global_data = {1, 2, 3, 4, 0, 0, 0, 0,
-   {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, {0, 0, 0, 0, 0, 0}, 0, NULL, NULL, NULL}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 0, 0, {{{0, 0, 0, 0, 0, 0, 0}}}};
+   {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, {0, 0, 0, 0, 0, 0}, 0, NULL, NULL, NULL, NULL, NULL}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 0, 0, {{{0, 0, 0, 0, 0, 0, 0}}}};
 /* End: Modified by Pinghai */
+
 uint32_t g_enclave_state = ENCLAVE_INIT_NOT_STARTED;
+
 /* Begin: Added by Pinghai */
 void* g_enclave_image_base = NULL;
 /* End: Added by Pinghai */

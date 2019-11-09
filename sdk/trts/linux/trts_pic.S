@@ -75,7 +75,7 @@ DECLARE_LOCAL_FUNC lock_enclave
  * ---------------------------------------------------------------------
  */
 DECLARE_LOCAL_FUNC get_thread_data
-    READ_TD_DATA self_addr
+    GET_MASTER_TLS_SEG
     ret
 
 /*
@@ -86,7 +86,7 @@ DECLARE_LOCAL_FUNC get_thread_data
  * ---------------------------------------------------------------------
  */
 DECLARE_LOCAL_FUNC get_stack_guard
-    READ_TD_DATA stack_guard
+    READ_MASTER_TLS_DATA stack_guard
     ret
 
 /*
@@ -117,19 +117,13 @@ DECLARE_GLOBAL_FUNC enclave_entry
     cmp     $0, %xax
     jne     .Ldo_handler                /* handle exception state */
     xor     %xdx, %xdx
-    READ_TD_DATA last_sp
+    READ_MASTER_TLS_DATA last_sp
     cmp     $0, %xax
     jne .Lswitch_stack
     GET_STACK_BASE  %xbx                /* if last_sp == 0, set sp to stack base */
     sub     $STATIC_STACK_SIZE, %xax    /* give space for static stack */
 .Lswitch_stack:
     xchg    %xsp, %xax
-
-#if defined(LINUX64)
-    PUSH_GPR
-    call    _eenter_load_slave_tls
-    POP_GPR
-#endif
 
     push    %xcx
     push    %xbp
@@ -162,15 +156,11 @@ DECLARE_GLOBAL_FUNC enclave_entry
 #endif
     call    restore_xregs
 
+    // mov     %rsp, %xdi
+    // call    eexit_update_lastsp
 /* set xdi and xsi */
     mov     $OCMD_ERET, %xdi
     mov     %xbx, %xsi
-
-#if defined(LINUX64)
-    PUSH_GPR
-    call    _eexit_update_master_tls
-    POP_GPR
-#endif
 
 /* restore stack */
     mov     -1*SE_WORDSIZE(%xbp), %xdx  /* xdx: xsp_u  */
@@ -279,7 +269,7 @@ DECLARE_LOCAL_FUNC do_ocall
 #endif
 
 /* save and clean extended feature registers */
-    READ_TD_DATA xsave_size
+    READ_MASTER_TLS_DATA xsave_size
     sub     %xax, %xsp                 /* allocate buffer to save xregs */
     mov     $0x3f, %xax
     not     %xax
@@ -303,7 +293,7 @@ DECLARE_LOCAL_FUNC do_ocall
 
 /* save and clean extended feature registers */
     mov     SE_WORDSIZE*19(%xsp), %xdi /* xsave pointer */
-    READ_TD_DATA xsave_size
+    READ_MASTER_TLS_DATA xsave_size
     mov     %xax, %xcx
     shr     $2, %xcx                   /* xsave size in dword */
     xor     %xax, %xax
@@ -336,7 +326,7 @@ DECLARE_LOCAL_FUNC do_ocall
      *     push TD.last_sp
      *     set TD.last_sp = xsp
      */
-    READ_TD_DATA self_addr
+    GET_MASTER_TLS_SEG
     mov     %xax, %xbx
 
     /* call update_ocall_lastsp */
@@ -351,12 +341,6 @@ DECLARE_LOCAL_FUNC do_ocall
 #ifdef LINUX64
     mov     SE_WORDSIZE*12(%xsp), %xdi   /* restore xdi */
     mov     SE_WORDSIZE*13(%xsp), %xsi   /* restore xdi */
-#endif
-
-#if defined(LINUX64)
-    PUSH_GPR
-    call    _eexit_update_master_tls
-    POP_GPR
 #endif
 
     /* restore outside stack context */

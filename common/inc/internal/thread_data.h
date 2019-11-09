@@ -82,12 +82,15 @@ typedef size_t sys_word_t;
  * RTS_SYSTEM_WORDSIZE.
  *
  * However, we need to take care when modifying the data structure in future.
+ *
+ * Update trts_pic.h if the layout is changeed
  */
 #define SGX_UTILITY_THREAD  0x1
 
+/* Make sure every tls-segment has a MASTER_TLS field */
 typedef struct _thread_data_t
 {
-    sys_word_t  self_addr;
+    sys_word_t  self_addr;          /* The last byte is used to store TLS type */
     sys_word_t  last_sp;            /* set by urts, relative to TCS */
     sys_word_t  stack_base_addr;    /* set by urts, relative to TCS */
     sys_word_t  stack_limit_addr;   /* set by urts, relative to TCS */
@@ -112,13 +115,16 @@ typedef struct _thread_data_t
 #endif
     sys_word_t  cxx_thread_info[6];
     sys_word_t  stack_commit_addr;
+
 	/* Begin: Added by Pinghai */
-    sys_word_t  master_tls_segment; /* is master fs/gs segment or not? */
     /*Load them when EENTERing */
-    struct _thread_data_t *fsbase;  /* 1. for master fs/gs-segment, always points to current fs/gs-segment */
-    struct _thread_data_t *gsbase;  /* 2. for slave fs/gs-segment, always points to master fs/gs-segment */
-	void    *thread_hcxt;
-    void    *signal_frame;          /* Point to signal frame created inside-SGX */
+    void    *master_tls;    /* always pointing to the tls-segment bound to TCS */
+    void    *cur_fs_seg;    /* 1. always pointing to current segment associated by fs-register */
+    void    *cur_gs_seg;    /* 2. always pointing to current segment associated by gs-register */
+
+    /* All fields may be used by thread-global private data */
+    void    *thread_hcxt;
+    void    *signal_frame;              /* Point to signal frame created inside-SGX */
     /* End: Added by Pinghai */
 } thread_data_t;
 
@@ -126,16 +132,19 @@ typedef struct _thread_data_t
 extern "C" {
 #endif
 
+/* Always return the tls-segment bound to TCS, which is an instance of thread_data_t */
 thread_data_t *get_thread_data(void);
 
 /* Begin: Added by Pinghai */
 #if defined(LINUX64)
+void init_slave_tls(void *tls_segment);
+void oret_load_slave_tls(void);
+void ecall_reset_tls_reg(void);
+void eexit_update_lastsp(void *last_sp);
 
-void init_slave_thread_data(thread_data_t *td);
-void load_fsbase(sys_word_t base);
-void load_gsbase(sys_word_t base);
-
-
+/* Important: SGX-DBI needs to invoke these two functions to setup a new segment */
+void load_segment_fs(void *tls_segment);
+void load_segment_gs(void *tls_segment);
 #endif
 /* End: Added by Pinghai */
 

@@ -67,10 +67,16 @@
 #define xsave_size          (SE_WORDSIZE * 7)
 #define self_addr           0
 #define stack_guard         (SE_WORDSIZE * 5)
+
 /* Begin: Added by Pinghai */
-#define master_flag			(SE_WORDSIZE *20)
-#define fsbase				(SE_WORDSIZE *21)
-#define gsbase				(SE_WORDSIZE *22)
+#define master_tls			(SE_WORDSIZE *20)
+#define cur_fs_seg			(SE_WORDSIZE *21)
+#define cur_gs_seg			(SE_WORDSIZE *22)
+
+#define TLS_TYPE_UNKNOW     0x1      // Use bit 0
+#define TLS_TYPE_TCS_TD     0x2      // Use bit 1
+#define TLS_TYPE_DBI_DR     0x4      // Use bit 2
+#define TLS_TYPE_DBI_APP    0x8      // Use bit 3
 /* End: Added by Pinghai */
 
 /* SSA GPR */
@@ -86,7 +92,9 @@
 
 #define dtv    SE_WORDSIZE
 #define tls    0
-.macro READ_TD_DATA offset
+
+/* The original READ_TD_DATA */
+.macro READ_TD_DATA_ORG offset
 #ifdef SE_SIM
 /* TLS support in simulation mode
  * see "sdk/simulation/uinst/linux/set_tls.c"
@@ -94,7 +102,6 @@
  * TD address (tcs->ofs_base) is set to tcb_head->dtv->value.
  * The offset of tcb_head->dtv->value is SE_WORDSIZE.
  */
-
 #if defined(LINUX32)
     mov     %gs:dtv, %xax
 #elif defined(LINUX64)
@@ -105,16 +112,54 @@
 
 #else /* SE_SIM */
 
-/* Begin: Modified by Pinghai */
 #if defined(LINUX32)
     mov     %gs:\offset, %xax
 #elif defined(LINUX64)
     mov     %fs:\offset, %xax
 #endif
-/* End: Modified by Pinghai */
 
 #endif /* !SE_SIM */
 .endm
+
+/* Begin: Added by Pinghai */
+.macro GET_MASTER_TLS_SEG
+#if defined(LINUX64)
+    mov     %fs:self_addr, %xax
+    test    %xax, %xax
+    jz      1f      // not initialized
+    test    $TLS_TYPE_TCS_TD, %al
+    jnz     2f      // initialized master tls
+    mov     %fs:master_tls, %xax
+    mov     (%xax), %xax
+2:
+    xor     %al, %al
+1:
+#endif
+.endm
+
+/* assert (offset != 0) */
+.macro READ_MASTER_TLS_DATA offset
+#if defined(LINUX64)
+    mov     %fs:self_addr, %xax
+    test    %xax, %xax
+    jz      1f      // not initialized
+    test    $TLS_TYPE_TCS_TD, %al
+    jnz     1f      // initialized master tls
+    mov     %fs:master_tls, %xax
+    mov     (%xax), %xax
+    xor     %al, %al
+    mov     \offset(%xax), %xax
+    jmp     2f
+1:
+    mov     %fs:\offset, %xax
+2:
+#endif
+.endm
+/* End: Modified by Pinghai */
+
+
+
+
 
 .macro GET_STACK_BASE tcs
     mov      \tcs, %xax
