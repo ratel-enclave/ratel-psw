@@ -141,7 +141,7 @@ void hand_signal_outside_sgx(int signum, siginfo_t* siginfo, void *priv)
 
 bool hand_signal_inside_SGXDBI(sigcxt_pkg_t *pkg)
 {
-    SE_TRACE(SE_TRACE_DEBUG, "Hand signal inside SGX");
+    SE_TRACE(SE_TRACE_DEBUG, "Hand signal inside SGX\n");
     //The ecall looks recursively, but it will not cause infinite call.
     //If exception is raised in trts again and again, the SSA will overflow, and finally it is EENTER exception.
     unsigned int ret = g_DBI_enclave->ecall(ECMD_SIGNAL, NULL, pkg);
