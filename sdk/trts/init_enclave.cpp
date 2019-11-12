@@ -56,8 +56,29 @@ sdk_version_t g_sdk_version = SDK_VERSION_1_5;
 
 /* Begin: Modified by Pinghai */
 /* NULL values corresponding to master_tls -> signal_frame */
-const volatile global_data_t g_global_data = {1, 2, 3, 4, 0, 0, 0, 0,
-   {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, {0, 0, 0, 0, 0, 0}, 0, NULL, NULL, NULL, NULL, NULL}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 0, 0, {{{0, 0, 0, 0, 0, 0, 0}}}};
+const volatile global_data_t
+    g_global_data = {1, 2, 3, 4, // enclave_size, heap_offset, heap_size
+                     0,          // dyRIO_cache_offset
+                     0,          // dyRIO_cache_size
+                     0,          // prog_arena_offset
+                     0,          // prog_arena_size
+                     {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                      0,                  // tls_addr & tls_array
+                      {0, 0, 0, 0, 0, 0}, // cxx_thread_info
+                      0,                  // stack_commit_addr
+                      NULL,               // master-tls
+                      0,                  // last_sp_SDK
+                      0,                  // stack_base_SDK
+                      0,                  // last_sp_DBI
+                      0,                  // stack_base_DBI
+                      NULL,               // cur_fs
+                      NULL,               // cur_gs
+                      NULL,
+                      NULL},
+                     {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+                     0,
+                     0,
+                     {{{0, 0, 0, 0, 0, 0, 0}}}};
 /* End: Modified by Pinghai */
 
 uint32_t g_enclave_state = ENCLAVE_INIT_NOT_STARTED;
@@ -66,12 +87,13 @@ uint32_t g_enclave_state = ENCLAVE_INIT_NOT_STARTED;
 void* g_enclave_image_base = NULL;
 /* End: Added by Pinghai */
 
-extern "C" {
-uintptr_t __stack_chk_guard = 0;
-#define __weak_alias(alias,sym)                 \
-    __asm__(".weak " __STRING(alias) " ; "      \
-        __STRING(alias) " = " __STRING(sym))
-__weak_alias(__intel_security_cookie, __stack_chk_guard);
+extern "C"
+{
+#define __weak_alias(alias, sym) \
+    __asm__(".weak " __STRING(alias) " ; " __STRING(alias) " = " __STRING(sym))
+
+    uintptr_t __stack_chk_guard = 0;
+    __weak_alias(__intel_security_cookie, __stack_chk_guard);
 }
 
 // init_enclave()

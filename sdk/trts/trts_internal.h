@@ -53,6 +53,19 @@ typedef struct {
     uint8_t entry_table[1];
 } entry_table_t;
 
+/* Begin: Added by Pinghai */
+typedef struct _eenter_frame_t
+{
+    uintptr_t ret_enter_enclave;
+    uintptr_t xdi;
+    uintptr_t xsi;
+    uintptr_t tcs;
+    uintptr_t ccsa;
+    uintptr_t xsp_u;
+    uintptr_t xbp_u;
+    uintptr_t ret_u; // <-- last_sp_SDK - 8
+} eenter_frame_t;
+/* End: Added by Pinghai */
 
 #ifdef __cplusplus
 extern "C" {
@@ -71,11 +84,13 @@ sgx_status_t do_ecall(int index, void *ms, void *tcs);
 sgx_status_t do_oret(void *ms);
 sgx_status_t trts_handle_exception(void *tcs, void *ms);
 /* Begin: Added by Pinghai */
-sgx_status_t trts_handle_DBI_signal(void *tcs, void *ms);
+sgx_status_t trts_handle_outside_signal(void *tcs, void *ms);
 /* End: Added by Pinghai */
 sgx_status_t do_ecall_add_thread(void *ms, void *tcs);
 sgx_status_t do_uninit_enclave(void *tcs);
 int check_static_stack_canary(void *tcs);
+
+void relocate_eenter_frame(eenter_frame_t* dst);
 
 #ifdef __cplusplus
 }

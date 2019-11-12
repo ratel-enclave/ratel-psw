@@ -116,15 +116,22 @@ typedef struct _thread_data_t
     sys_word_t  cxx_thread_info[6];
     sys_word_t  stack_commit_addr;
 
-	/* Begin: Added by Pinghai */
-    /*Load them when EENTERing */
+    /* Begin: Added by Pinghai */
     void    *master_tls;    /* always pointing to the tls-segment bound to TCS */
+
+    /* The DBI (DR & App) starts with its own stack, initialized as stack_commit_addr + 4Pages*/
+    sys_word_t  last_sp_SDK;
+    sys_word_t  stack_base_SDK;
+    sys_word_t  last_sp_DBI;
+    sys_word_t  stack_base_DBI;
+
+    /*Load them when do_ret */
     void    *cur_fs_seg;    /* 1. always pointing to current segment associated by fs-register */
     void    *cur_gs_seg;    /* 2. always pointing to current segment associated by gs-register */
 
     /* All fields may be used by thread-global private data */
     void    *thread_hcxt;
-    void    *signal_frame;              /* Point to signal frame created inside-SGX */
+    void    *signal_frame;  /* Point to signal frame created inside-SGX */
     /* End: Added by Pinghai */
 } thread_data_t;
 

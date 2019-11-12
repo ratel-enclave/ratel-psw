@@ -356,7 +356,7 @@ extern "C" __attribute__((regparm(1))) void internal_handle_exception(sgx_except
 }
 
 /* Hanlde signals triggerred inside sgx-enclave on behalve of DBI */
-extern "C" __attribute__((regparm(1))) void internal_handle_DBI_signal_in(sgx_exception_info_t *info)
+extern "C" __attribute__((regparm(1))) void internal_handle_DBI_inside_signal(sgx_exception_info_t *info)
 {
     thread_data_t *master_td;
 
@@ -526,6 +526,8 @@ trts_handle_exception(void *tcs, void *ms)
         master_td = get_thread_data();
         pkg = (sigcxt_pkg_t *)malloc(sizeof(sigcxt_pkg_t));
         memcpy(pkg, info->sigcxt_pkg, sizeof(sigcxt_pkg_t));
+
+        memset(&pkg->ctx.uc_mcontext, 0, sizeof(mcontext_t));
         pkg->ctx.uc_mcontext.gregs[SIGCXT_R8] = info->cpu_context.REG(8);
         pkg->ctx.uc_mcontext.gregs[SIGCXT_R9] = info->cpu_context.REG(9);
         pkg->ctx.uc_mcontext.gregs[SIGCXT_R10] = info->cpu_context.REG(10);
@@ -544,7 +546,8 @@ trts_handle_exception(void *tcs, void *ms)
         pkg->ctx.uc_mcontext.gregs[SIGCXT_RSP] = info->cpu_context.REG(sp);
         pkg->ctx.uc_mcontext.gregs[SIGCXT_RIP] = info->cpu_context.REG(ip);
         pkg->ctx.uc_link = NULL;
-        ssa_gpr->REG(ip) = (size_t)internal_handle_DBI_signal_in; // The signal is triggered by App's code?
+
+        ssa_gpr->REG(ip) = (size_t)internal_handle_DBI_inside_signal; // The signal is triggered by App's code?
 
         master_td->signal_frame = pkg;
     }
@@ -590,7 +593,7 @@ typedef struct _simu_pt_gregs
 
 /* handler signals triggerred outside-sgx enclave */
 extern "C"
-void internal_handle_DBI_signal_out(simu_pt_gregs *regs)
+void internal_handle_DBI_outside_signal(simu_pt_gregs *regs)
 {
     sgx_exception_info_t info;
     thread_data_t *master_td;
@@ -645,10 +648,10 @@ void internal_handle_DBI_signal_out(simu_pt_gregs *regs)
 }
 
 extern "C"
-void no_name_function(void)
+void function_container_651(void)
 {
     __asm__(
-        "callwrapper_internal_handle_DBI_signal_out:\n\t"
+        "callwrapper_internal_handle_DBI_outside_signal:\n\t"
         // "call 1f\n"
         // "1:\n\t"
         "push  %rsp\n\t"
@@ -670,13 +673,13 @@ void no_name_function(void)
         "push  %r8\n\t"
 
         "mov %rsp, %rdi\n\t"
-        "call  internal_handle_DBI_signal_out\n\t");
+        "call  internal_handle_DBI_outside_signal\n\t");
 }
 
-extern "C" void callwrapper_internal_handle_DBI_signal_out();
+extern "C" void callwrapper_internal_handle_DBI_outside_signal();
 extern "C" void oret_load_slave_tls(void);
 /* exception triggered when running out-sgx code */
-extern "C" sgx_status_t trts_handle_DBI_signal(void *tcs, void *ms)
+extern "C" sgx_status_t trts_handle_outside_signal(void *tcs, void *ms)
 {
     // Inject a signal framework on dynamorio's signal stack
     // 1. Get dynamorio's signal stack
@@ -709,10 +712,13 @@ extern "C" sgx_status_t trts_handle_DBI_signal(void *tcs, void *ms)
     pkg = (sigcxt_pkg_t *)malloc(sizeof(sigcxt_pkg_t));
 
     memcpy(pkg, ms, sizeof(sigcxt_pkg_t));
+
+    memset(&pkg->ctx.uc_mcontext, 0, sizeof(mcontext_t));
     pkg->ctx.uc_mcontext.gregs[SIGCXT_RSP] = (long long)stack_ret;
     pkg->ctx.uc_mcontext.gregs[SIGCXT_RIP] = (long long)*stack_ret;
+    pkg->ctx.uc_link = NULL;
 
-    *stack_ret = (uintptr_t)callwrapper_internal_handle_DBI_signal_out;
+    *stack_ret = (uintptr_t)callwrapper_internal_handle_DBI_outside_signal;
     master_td->signal_frame = pkg;
 
     oret_load_slave_tls();

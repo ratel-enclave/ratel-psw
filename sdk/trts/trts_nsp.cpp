@@ -209,7 +209,7 @@ int enter_enclave(int index, void *ms, void *tcs, int cssa)
 		/* Begin: Added by Pinghai */
         else if (index == ECMD_SIGNAL)
         {
-            error = trts_handle_DBI_signal(tcs, ms);
+            error = trts_handle_outside_signal(tcs, ms);
         }
 		/* End: Added by Pinghai */
     }

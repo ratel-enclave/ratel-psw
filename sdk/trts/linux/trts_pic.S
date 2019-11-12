@@ -117,7 +117,7 @@ DECLARE_GLOBAL_FUNC enclave_entry
     cmp     $0, %xax
     jne     .Ldo_handler                /* handle exception state */
     xor     %xdx, %xdx
-    READ_MASTER_TLS_DATA last_sp
+    READ_MASTER_TLS_DATA last_sp_SDK
     cmp     $0, %xax
     jne .Lswitch_stack
     GET_STACK_BASE  %xbx                /* if last_sp == 0, set sp to stack base */
@@ -125,6 +125,7 @@ DECLARE_GLOBAL_FUNC enclave_entry
 .Lswitch_stack:
     xchg    %xsp, %xax
 
+    /* Create an eenter_frame_t */
     push    %xcx
     push    %xbp
 
@@ -329,7 +330,6 @@ DECLARE_LOCAL_FUNC do_ocall
     GET_MASTER_TLS_SEG
     mov     %xax, %xbx
 
-    /* call update_ocall_lastsp */
 #ifdef LINUX32
     mov     %xsp, (%xsp)
 #else
@@ -387,20 +387,20 @@ DECLARE_LOCAL_FUNC do_ocall
  */
 DECLARE_LOCAL_FUNC __morestack
     .cfi_startproc
-    push %xbp
+    push    %xbp
     .cfi_def_cfa_offset     2*SE_WORDSIZE
     .cfi_offset             xbp,-2*SE_WORDSIZE
-    mov %xsp, %xbp
+    mov     %xsp, %xbp
     .cfi_def_cfa_register   xbp
-    sub $(4*SE_WORDSIZE), %xsp
+    sub     $(4*SE_WORDSIZE), %xsp
 #ifdef LINUX32
     /* save the 2 parameters */
-    mov (2*SE_WORDSIZE)(%xbp), %xax
-    mov %xax, (0*SE_WORDSIZE)(%xsp)
-    mov (3*SE_WORDSIZE)(%xbp), %xax
-    mov %xax, (1*SE_WORDSIZE)(%xsp)
+    mov     (2*SE_WORDSIZE)(%xbp), %xax
+    mov     %xax, (0*SE_WORDSIZE)(%xsp)
+    mov     (3*SE_WORDSIZE)(%xbp), %xax
+    mov     %xax, (1*SE_WORDSIZE)(%xsp)
 #endif
-    call        do_ocall
+    call    do_ocall
     leave
     ret
     .cfi_endproc
@@ -594,3 +594,37 @@ DECLARE_LOCAL_FUNC continue_execution
     pop     %xsp                       # xsp: xax
     xchg    %xax, %xsp
     ret
+
+/* Begin: Added by Pinghai */
+DECLARE_LOCAL_FUNC call_switch_stack_to_DBI
+    push    %xbp        /* saved for the debugger to unfold the stack */
+    push    %xbx        /* use xbx as temprary register */
+
+    /* An ecall can be followed by many ocalls or nested ecalls; */
+    /* Create an eenter_frame_t to avoid messing up the stack context*/
+    push    %xdi
+    push    %xsi
+    sub     $0x60, %xsp
+    mov     %xsp, %xdi
+    call    relocate_eenter_frame
+    add     $0x60, %xsp
+    pop     %xsi
+    pop     %xdi
+
+    /* Backup before jumping to callee */
+    /* Step 1: get stack TOS of DBI */
+    mov     %fs:last_sp_DBI, %xbx
+
+    /* Step 2: swtich stack */
+    xchg    %xsp, %xbx
+
+    /* set up for call */
+    push    %xbx
+    call    *%xsi
+    pop     %rsp
+
+    /* restore to caller */
+    pop     %xbx
+    pop     %xbp
+    ret
+/* End: Added by Pinghai */

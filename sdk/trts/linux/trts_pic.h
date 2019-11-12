@@ -60,23 +60,24 @@
 /* Thread Data
  * c.f. data structure defintion for thread_data_t in `rts.h'.
  */
+#define self_addr           0
 #define last_sp             (SE_WORDSIZE * 1)
 #define stack_base_addr     (SE_WORDSIZE * 2)
 #define stack_limit_addr    (SE_WORDSIZE * 3)
 #define first_ssa_gpr       (SE_WORDSIZE * 4)
 #define xsave_size          (SE_WORDSIZE * 7)
-#define self_addr           0
 #define stack_guard         (SE_WORDSIZE * 5)
 
 /* Begin: Added by Pinghai */
 #define master_tls			(SE_WORDSIZE *20)
-#define cur_fs_seg			(SE_WORDSIZE *21)
-#define cur_gs_seg			(SE_WORDSIZE *22)
+#define last_sp_SDK			(SE_WORDSIZE *21)
+#define stack_base_SDK      (SE_WORDSIZE *22)
+#define last_sp_DBI			(SE_WORDSIZE *23)
+#define stack_base_DBI      (SE_WORDSIZE *24)
+#define cur_fs_seg			(SE_WORDSIZE *25)
+#define cur_gs_seg			(SE_WORDSIZE *26)
 
-#define TLS_TYPE_UNKNOW     0x1      // Use bit 0
-#define TLS_TYPE_TCS_TD     0x2      // Use bit 1
-#define TLS_TYPE_DBI_DR     0x4      // Use bit 2
-#define TLS_TYPE_DBI_APP    0x8      // Use bit 3
+#define TLS_TYPE_TCS_TD     0x1      // Use bit 0
 /* End: Added by Pinghai */
 
 /* SSA GPR */
@@ -126,9 +127,11 @@
 #if defined(LINUX64)
     mov     %fs:self_addr, %xax
     test    %xax, %xax
-    jz      1f      // not initialized
-    test    $TLS_TYPE_TCS_TD, %al
-    jnz     2f      // initialized master tls
+    /* if TLS is not initialized, it must be a master-tls */
+    jz      1f
+    test    $ TLS_TYPE_TCS_TD, %al
+    jnz     2f
+    /* if it is a slave-tls, its tls:master_tls must be setup */
     mov     %fs:master_tls, %xax
     mov     (%xax), %xax
 2:
@@ -142,9 +145,11 @@
 #if defined(LINUX64)
     mov     %fs:self_addr, %xax
     test    %xax, %xax
-    jz      1f      // not initialized
-    test    $TLS_TYPE_TCS_TD, %al
-    jnz     1f      // initialized master tls
+    /* if TLS is not initialized, it must be a master-tls */
+    jz      1f
+    test    $ TLS_TYPE_TCS_TD, %al
+    jnz     1f
+    /* if it is a slave-tls, its tls:master_tls must be setup */
     mov     %fs:master_tls, %xax
     mov     (%xax), %xax
     xor     %al, %al
@@ -157,35 +162,7 @@
 .endm
 /* End: Modified by Pinghai */
 
-
-
-
-
 .macro GET_STACK_BASE tcs
     mov      \tcs, %xax
     sub      $SE_GUARD_PAGE_SIZE, %xax
 .endm
-
-/* Begin: Added by Pinghai */
-.macro PUSH_GPR
-    push    %xax
-    push    %xdi
-    push    %xsi
-    push    %xdx
-    push    %xcx
-    push    %r8
-    push    %r9
- .endm
-
-
-.macro POP_GPR
-    pop    %r9
-    pop    %r8
-    pop    %xcx
-    pop    %xdx
-    pop    %xsi
-    pop    %xdi
-    pop    %xax
-.endm
-/* End: Added by Pinghai */
-

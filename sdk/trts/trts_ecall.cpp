@@ -200,18 +200,29 @@ static void do_del_tcs(void *ptcs)
 static volatile bool           g_is_first_ecall = true;
 static volatile sgx_spinlock_t g_ife_lock       = SGX_SPINLOCK_INITIALIZER;
 
+void relocate_eenter_frame(eenter_frame_t *dst)
+{
+    thread_data_t *thread_data = get_thread_data();
+    eenter_frame_t *src;
+
+    src = (eenter_frame_t *)(thread_data->last_sp_SDK - sizeof(eenter_frame_t));
+    memcpy(dst, src, sizeof(eenter_frame_t));
+    thread_data->last_sp_SDK = (uintptr_t)dst + sizeof(eenter_frame_t);
+}
 
 extern "C" void ecall_reset_tls_reg(void);
 typedef sgx_status_t (*ecall_func_t)(void *ms);
+extern "C" sgx_status_t call_switch_stack_to_DBI(void *ms, ecall_func_t func);
+
 static sgx_status_t trts_ecall(uint32_t ordinal, void *ms)
 {
+    thread_data_t *thread_data = get_thread_data();
     sgx_status_t status = SGX_ERROR_UNEXPECTED;
 
     if (unlikely(g_is_first_ecall))
     {
         // The thread performing the global initialization cannot do a nested ECall
-        thread_data_t *thread_data = get_thread_data();
-        if (thread_data->last_sp != thread_data->stack_base_addr)
+        if (thread_data->last_sp_SDK != thread_data->stack_base_SDK)
         { // nested ecall
             return SGX_ERROR_ECALL_NOT_ALLOWED;
         }
@@ -220,11 +231,11 @@ static sgx_status_t trts_ecall(uint32_t ordinal, void *ms)
         if (g_is_first_ecall)
         {
 #ifndef SE_SIM
-            if(EDMM_supported)
+            if (EDMM_supported)
             {
                 //change back the page permission
                 size_t enclave_start = (size_t)&__ImageBase;
-                if((status = change_protection((void *)enclave_start)) != SGX_SUCCESS)
+                if ((status = change_protection((void *)enclave_start)) != SGX_SUCCESS)
                 {
                     sgx_spin_unlock(&g_ife_lock);
                     return status;
@@ -240,17 +251,17 @@ static sgx_status_t trts_ecall(uint32_t ordinal, void *ms)
 
     void *addr = NULL;
     status = get_func_addr(ordinal, &addr);
-    if(status == SGX_SUCCESS)
+    if (status == SGX_SUCCESS)
     {
         ecall_func_t func = (ecall_func_t)addr;
-        status = func(ms);
+        // status = func(ms);
+        status = call_switch_stack_to_DBI(ms, func);
     }
 
-    /* Anyway, the TLS segments should be restored */
+    /* Anyway, the TLS segments should be restored to master-tls*/
     ecall_reset_tls_reg();
     return status;
 }
-
 
 extern "C" uintptr_t __stack_chk_guard;
 static void init_static_stack_canary(void *tcs)
@@ -273,11 +284,9 @@ static bool is_utility_thread()
 }
 
 /* Begin: Added by Pinghai */
-#define TLS_TYPE_UNKNOW     0x1      // Use bit 0
-#define TLS_TYPE_TCS_TD     0x2      // Use bit 1
-#define TLS_TYPE_DBI_DR     0x4      // Use bit 2
-#define TLS_TYPE_DBI_APP    0x8      // Use bit 3
+#define TLS_TYPE_TCS_TD     0x1      // Use bit 1
 
+#define PAGE_SIZE   4096
 static void init_master_tls(void* tcs, thread_data_t *td)
 {
     size_t stack_guard = td->stack_guard;
@@ -292,16 +301,38 @@ static void init_master_tls(void* tcs, thread_data_t *td)
     td->tls_array += (size_t)tcs;
     td->tls_addr += (size_t)tcs;
 
-    td->last_sp -= (size_t)STATIC_STACK_SIZE;
-    td->stack_base_addr -= (size_t)STATIC_STACK_SIZE;
+    /* Begin: Added by Pinghai. Don't change the order */
+    /* Sperate two stacks for SDK & DBI, leave only 4 higer pages for SDK stack */
+    td->last_sp_SDK = td->last_sp;
+    td->stack_base_SDK = td->last_sp_SDK;
+
+    td->last_sp_DBI = td->last_sp_SDK - 4 * PAGE_SIZE;
+    td->stack_base_DBI = td->last_sp_DBI;
+    /* End: Added by Pinghai. */
+
+    /* Begin: Modified by Pinghai */
+    /* Create read-zone on stack */
+    td->last_sp_SDK -= (size_t)STATIC_STACK_SIZE;
+    td->stack_base_SDK -= (size_t)STATIC_STACK_SIZE;
+
+    td->last_sp_DBI -= (size_t)STATIC_STACK_SIZE;
+    td->stack_base_DBI -= (size_t)STATIC_STACK_SIZE;
+
+    td->last_sp = td->last_sp_SDK;
+    td->stack_base_addr = td->stack_base_SDK;
+    /* End: Modified by Pinghai */
+
+
     td->stack_guard = stack_guard;
     td->flags = thread_flags;
     init_static_stack_canary(tcs);
 
+    /* Begin: Added by Pinghai */
     td->self_addr |= TLS_TYPE_TCS_TD;
     td->master_tls = td;
     td->cur_fs_seg = td;
     td->cur_gs_seg = td;
+    /* End: Added by Pinghai */
 }
 
 
@@ -321,14 +352,14 @@ sgx_status_t do_init_thread(void *tcs)
 
     assert(thread_data != NULL);
 
-    #ifndef SE_SIM
+#ifndef SE_SIM
     size_t saved_stack_commit_addr = thread_data->stack_commit_addr;
     bool thread_first_init = (saved_stack_commit_addr == 0) ? true : false;
 #endif
 
-	/* Begin: Modified by Pinghai */
+    /* Begin: Modified by Pinghai */
     init_master_tls(tcs, thread_data);
-	/* End: Modified by Pinghai */
+    /* End: Modified by Pinghai */
 
 #ifndef SE_SIM
     if (EDMM_supported && is_dynamic_thread(tcs))
@@ -348,11 +379,11 @@ sgx_status_t do_init_thread(void *tcs)
     uintptr_t tls_addr = 0;
     size_t tdata_size = 0;
 
-    if(0 != GET_TLS_INFO(&__ImageBase, &tls_addr, &tdata_size))
+    if (0 != GET_TLS_INFO(&__ImageBase, &tls_addr, &tdata_size))
     {
         return SGX_ERROR_UNEXPECTED;
     }
-    if(tls_addr)
+    if (tls_addr)
     {
         memset((void *)TRIM_TO_PAGE(thread_data->tls_addr), 0, ROUND_TO_PAGE(thread_data->self_addr - thread_data->tls_addr));
         memcpy_s((void *)(thread_data->tls_addr), thread_data->self_addr - thread_data->tls_addr, (void *)tls_addr, tdata_size);
@@ -364,15 +395,15 @@ sgx_status_t do_init_thread(void *tcs)
 sgx_status_t do_ecall(int index, void *ms, void *tcs)
 {
     sgx_status_t status = SGX_ERROR_UNEXPECTED;
-    if(ENCLAVE_INIT_DONE != get_enclave_state())
+    if (ENCLAVE_INIT_DONE != get_enclave_state())
     {
         return status;
     }
     thread_data_t *thread_data = get_thread_data();
-    if (NULL == thread_data)// || ((thread_data->stack_base_addr == thread_data->last_sp) && (0 != g_global_data.thread_policy)))
+    if (NULL == thread_data) // || ((thread_data->stack_base_addr == thread_data->last_sp) && (0 != g_global_data.thread_policy)))
     {
         status = do_init_thread(tcs);
-        if(0 != status)
+        if (0 != status)
         {
             return status;
         }
@@ -386,10 +417,10 @@ sgx_status_t do_ecall_add_thread(void *ms, void *tcs)
 {
     sgx_status_t status = SGX_ERROR_UNEXPECTED;
 
-    if(!is_utility_thread())
+    if (!is_utility_thread())
         return status;
 
-    struct ms_tcs *ms_tcs = (struct ms_tcs*)ms;
+    struct ms_tcs *ms_tcs = (struct ms_tcs *)ms;
     if (ms_tcs == NULL)
     {
         return status;
@@ -400,20 +431,20 @@ sgx_status_t do_ecall_add_thread(void *ms, void *tcs)
         abort();
     }
 
-    void* ptcs = ms_tcs->ptcs;
+    void *ptcs = ms_tcs->ptcs;
     if (ptcs == NULL)
     {
         return status;
     }
 
     status = do_init_thread(tcs);
-    if(SGX_SUCCESS != status)
+    if (SGX_SUCCESS != status)
     {
         return status;
     }
 
     status = do_save_tcs(ptcs);
-    if(SGX_SUCCESS != status)
+    if (SGX_SUCCESS != status)
     {
         return status;
     }
@@ -421,7 +452,7 @@ sgx_status_t do_ecall_add_thread(void *ms, void *tcs)
     status = do_add_thread(ptcs);
     if (SGX_SUCCESS != status)
     {
-    	do_del_tcs(ptcs);
+        do_del_tcs(ptcs);
         return status;
     }
 
@@ -439,7 +470,7 @@ sgx_status_t do_ecall_add_thread(void *ms, void *tcs)
 sgx_status_t do_uninit_enclave(void *tcs)
 {
 #ifndef SE_SIM
-    if(is_dynamic_thread_exist() && !is_utility_thread())
+    if (is_dynamic_thread_exist() && !is_utility_thread())
         return SGX_ERROR_UNEXPECTED;
 #endif
     sgx_spin_lock(&g_tcs_node_lock);
@@ -460,7 +491,7 @@ sgx_status_t do_uninit_enclave(void *tcs)
         size_t start = (size_t)DEC_TCS_POINTER(tcs_node->tcs);
         size_t end = start + (1 << SE_PAGE_SHIFT);
         int rc = sgx_accept_forward(SI_FLAG_TRIM | SI_FLAG_MODIFIED, start, end);
-        if(rc != 0)
+        if (rc != 0)
         {
             return SGX_ERROR_UNEXPECTED;
         }
@@ -489,11 +520,13 @@ extern "C" sgx_status_t trts_mprotect(size_t start, size_t size, uint64_t perms)
     int rc = -1;
     size_t page;
     sgx_status_t ret = SGX_SUCCESS;
-    SE_DECLSPEC_ALIGN(sizeof(sec_info_t)) sec_info_t si;
+    SE_DECLSPEC_ALIGN(sizeof(sec_info_t))
+    sec_info_t si;
 
     //Error return if start or size is not page-aligned or size is zero.
     if (!IS_PAGE_ALIGNED(start) || (size == 0) || !IS_PAGE_ALIGNED(size))
         return SGX_ERROR_INVALID_PARAMETER;
+
     if (g_sdk_version == SDK_VERSION_2_0)
     {
         ret = change_permissions_ocall(start, size, perms);
@@ -501,17 +534,17 @@ extern "C" sgx_status_t trts_mprotect(size_t start, size_t size, uint64_t perms)
             return ret;
     }
 
-    si.flags = perms|SI_FLAG_REG|SI_FLAG_PR;
+    si.flags = perms | SI_FLAG_REG | SI_FLAG_PR;
     memset(&si.reserved, 0, sizeof(si.reserved));
 
-    for(page = start; page < start + size; page += SE_PAGE_SIZE)
+    for (page = start; page < start + size; page += SE_PAGE_SIZE)
     {
         do_emodpe(&si, page);
         // If the target permission to set is RWX, no EMODPR, hence no EACCEPT.
-        if ((perms & (SI_FLAG_W|SI_FLAG_X)) != (SI_FLAG_W|SI_FLAG_X))
+        if ((perms & (SI_FLAG_W | SI_FLAG_X)) != (SI_FLAG_W | SI_FLAG_X))
         {
             rc = do_eaccept(&si, page);
-            if(rc != 0)
+            if (rc != 0)
                 return (sgx_status_t)rc;
         }
     }
