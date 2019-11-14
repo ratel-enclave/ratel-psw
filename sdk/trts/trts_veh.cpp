@@ -49,16 +49,8 @@
 #include "trts_inst.h"
 #include "util.h"
 #include "trts_util.h"
+#include "trts_veh.h"
 
-/* Begin: Added by Pinghai */
-#define SIGILL      4
-#define SIGABRT     6
-#define SIGFPE      8
-#define SIGSEGV     11
-#define SIGBUS      10
-#define SIGSYS      12
-#define SIGTRAP     5
-/* End: Added by Pinghai */
 
 typedef struct _handler_node_t
 {
@@ -68,6 +60,7 @@ typedef struct _handler_node_t
 
 static handler_node_t *g_first_node = NULL;
 static sgx_spinlock_t g_handler_lock = SGX_SPINLOCK_INITIALIZER;
+// static bool g_setup_DBI;
 
 static uintptr_t g_veh_cookie = 0;
 #define ENC_VEH_POINTER(x)  (uintptr_t)(x) ^ g_veh_cookie
@@ -139,6 +132,7 @@ void *sgx_register_exception_handler(int is_first_handler, sgx_exception_handler
 
     return node;
 }
+
 // sgx_unregister_exception_handler()
 //      unregister a custom exception handler.
 // Parameter
@@ -202,9 +196,9 @@ extern "C" __attribute__((regparm(1))) void continue_execution(sgx_exception_inf
  */
 extern "C" __attribute__((regparm(1))) void _internal_handle_exception(sgx_exception_info_t *info, bool sgxapp)
 {
+    thread_data_t *thread_data = get_thread_data();
     int status = EXCEPTION_CONTINUE_SEARCH;
     handler_node_t *node = NULL;
-    thread_data_t *thread_data = get_thread_data();
     size_t size = 0;
     uintptr_t *nhead = NULL;
     uintptr_t *ntmp = NULL;
@@ -269,13 +263,6 @@ extern "C" __attribute__((regparm(1))) void _internal_handle_exception(sgx_excep
     }
     free(nhead);
 
-    /* free the dynamically allocated memory */
-    if (info->sigcxt_pkg != NULL)
-    {
-        free(info->sigcxt_pkg);
-        info->sigcxt_pkg = NULL;
-    }
-
     // call default handler
     // ignore invalid return value, treat to EXCEPTION_CONTINUE_SEARCH
     // check SP to be written on SSA is pointing to the trusted stack
@@ -305,78 +292,55 @@ failed_end:
 }
 /* End: Modified by Pinghai */
 
-/* Begin: Added by Pinghai */
-/* A package stores all contxt information, compatible with DynamoRIO's sigframe_rt_t */
-typedef struct _mcontext_t
-{
-    long long gregs[23];
-    char fpregs[8];
-    unsigned long long __reserved1[8];
-} mcontext_t;
 
-typedef struct _ucontext_t
+/* We don't consider nested signal */
+extern "C"
+void initialize_signal_frame(thread_data_t *td)
 {
-    unsigned long uc_flags;
-    struct _ucontext_t *uc_link;
-    char uc_stack[24];
-    mcontext_t uc_mcontext;
-    char uc_sigmask[128];
-    char __fpregs_mem[512];
-} ucontext_t;
+    sgx_exception_info_t *info = (sgx_exception_info_t *)malloc(sizeof(sgx_exception_info_t));
+    sigcxt_pkg_t *pkg = (sigcxt_pkg_t *)malloc(sizeof(sigcxt_pkg_t));
 
-typedef struct _sigcxt_pkg_t
+    info->sigcxt_pkg = pkg;
+    td->signal_info = info;
+}
+
+extern "C"
+void finalize_signal_frame(thread_data_t *td)
 {
-    int signum;
-    ucontext_t ctx;
-    char info[128];
-} sigcxt_pkg_t;
+    sgx_exception_info_t *info;
 
-/* refer to struct _kernel_sigcontext_t */
-#define SIGCXT_R8 0
-#define SIGCXT_R9 1
-#define SIGCXT_R10 2
-#define SIGCXT_R11 3
-#define SIGCXT_R12 4
-#define SIGCXT_R13 5
-#define SIGCXT_R14 6
-#define SIGCXT_R15 7
-#define SIGCXT_RDI 8
-#define SIGCXT_RSI 9
-#define SIGCXT_RBP 10
-#define SIGCXT_RBX 11
-#define SIGCXT_RDX 12
-#define SIGCXT_RAX 13
-#define SIGCXT_RCX 14
-#define SIGCXT_RSP 15
-#define SIGCXT_RIP 16
+    info = (sgx_exception_info_t*)td->signal_info;
+    if (info != NULL)
+    {
+        if (info->sigcxt_pkg != NULL)
+            free(info->sigcxt_pkg);
+        info->sigcxt_pkg = NULL;
+    }
+    free(info);
+    td->signal_info = NULL;
+}
 
-extern "C" __attribute__((regparm(1))) void internal_handle_exception(sgx_exception_info_t *info)
+extern "C" __attribute__((regparm(1))) void internal_handle_exception(void)
 {
-    _internal_handle_exception(info, false);
+    thread_data_t *thread_data = get_thread_data();
+
+    _internal_handle_exception((sgx_exception_info_t*)thread_data->signal_info, false);
 }
 
 /* Hanlde signals triggerred inside sgx-enclave on behalve of DBI */
-extern "C" __attribute__((regparm(1))) void internal_handle_DBI_inside_signal(sgx_exception_info_t *info)
+extern "C" __attribute__((regparm(1))) void internal_handle_DBI_inside_signal(void)
 {
-    thread_data_t *master_td;
+    thread_data_t *thread_data = get_thread_data();
 
-    master_td = get_thread_data();
-    info->sigcxt_pkg = master_td->signal_frame;
-    master_td->signal_frame = NULL;
-
-    _internal_handle_exception(info, true);
+    _internal_handle_exception((sgx_exception_info_t*)thread_data->signal_info, true);
 }
 /* End: Added by Pinghai */
 
-static int expand_stack_by_pages(void *start_addr, size_t page_count)
+extern "C" uintptr_t get_sdk_signal_stack(void)
 {
-    int ret = -1;
+    thread_data_t *thread_data = get_thread_data();
 
-    if ((start_addr == NULL) || (page_count == 0))
-        return -1;
-
-    ret = apply_pages_within_exception(start_addr, page_count);
-    return ret;
+    return (thread_data->stack_base_addr + STATIC_STACK_SIZE);
 }
 
 // trts_handle_exception(void *tcs)
@@ -392,8 +356,8 @@ trts_handle_exception(void *tcs, void *ms)
     thread_data_t *thread_data = get_thread_data();
     ssa_gpr_t *ssa_gpr = NULL;
     sgx_exception_info_t *info = NULL;
-    uintptr_t sp, *new_sp = NULL;
-    size_t size = 0;
+    sigcxt_pkg_t *pkg = NULL;
+    uintptr_t sp;
 
     if (tcs == NULL)
         goto default_handler;
@@ -423,58 +387,6 @@ trts_handle_exception(void *tcs, void *ms)
         return SGX_ERROR_STACK_OVERRUN;
     }
 
-    size = 0;
-#ifdef SE_GNU64
-    size += 128; // x86_64 requires a 128-bytes red zone, which begins directly
-    // after the return addr and includes func's arguments
-#endif
-
-    // decrease the stack to give space for info
-    size += sizeof(sgx_exception_info_t);
-    sp -= size;
-    sp = sp & ~0xF;
-
-    // check the decreased sp to make sure it is in the trusted stack range
-    if(!is_stack_addr((void *)sp, size))
-    {
-        g_enclave_state = ENCLAVE_CRASHED;
-        return SGX_ERROR_STACK_OVERRUN;
-    }
-
-    info = (sgx_exception_info_t *)sp;
-    // decrease the stack to save the SSA[0]->ip
-    size = sizeof(uintptr_t);
-    sp -= size;
-    if(!is_stack_addr((void *)sp, size))
-    {
-        g_enclave_state = ENCLAVE_CRASHED;
-        return SGX_ERROR_STACK_OVERRUN;
-    }
-
-    // sp is within limit_addr and commit_addr, currently only SGX 2.0 under hardware mode will enter this branch.^M
-    if((size_t)sp < thread_data->stack_commit_addr)
-    {
-        int ret = -1;
-        size_t page_aligned_delta = 0;
-        /* try to allocate memory dynamically */
-        page_aligned_delta = ROUND_TO(thread_data->stack_commit_addr - (size_t)sp, SE_PAGE_SIZE);
-        if ((thread_data->stack_commit_addr > page_aligned_delta)
-                && ((thread_data->stack_commit_addr - page_aligned_delta) >= thread_data->stack_limit_addr))
-        {
-            ret = expand_stack_by_pages((void *)(thread_data->stack_commit_addr - page_aligned_delta), (page_aligned_delta >> SE_PAGE_SHIFT));
-        }
-        if (ret == 0)
-        {
-            thread_data->stack_commit_addr -= page_aligned_delta;
-            return SGX_SUCCESS;
-        }
-        else
-        {
-            g_enclave_state = ENCLAVE_CRASHED;
-            return SGX_ERROR_STACK_OVERRUN;
-        }
-    }
-
     /* exception handlers are not allowed:
     A: to call in a non-exception state, and
     B: no additional exception handler */
@@ -483,7 +395,11 @@ trts_handle_exception(void *tcs, void *ms)
         goto default_handler;
     }
 
+    info = (sgx_exception_info_t *)thread_data->signal_info;
+    assert(info != NULL);
+
     // initialize the info with SSA[0]
+    info = (sgx_exception_info_t *)thread_data->signal_info;
     info->exception_vector = (sgx_exception_vector_t)ssa_gpr->exit_info.vector;
     info->exception_type = (sgx_exception_type_t)ssa_gpr->exit_info.exit_type;
 
@@ -507,25 +423,15 @@ trts_handle_exception(void *tcs, void *ms)
     info->cpu_context.r14 = ssa_gpr->r14;
     info->cpu_context.r15 = ssa_gpr->r15;
 #endif
-    info->sigcxt_pkg = ms;
 
-    new_sp = (uintptr_t *)sp;
-    if (ssa_gpr->exit_info.valid == 1)
-    {
-        ssa_gpr->REG(ip) = (size_t)internal_handle_exception; // prepare the ip for 2nd phrase handling
-    }
 
     /* Begin: Added by Pinghai */
     /* Give high privilege to SGX-DBI if it has registered signal handlers */
     if (g_first_node != NULL)
     {
-        /* create an internal copy of the signal framwork and update it */
-        thread_data_t *master_td;
-        sigcxt_pkg_t *pkg;
-
-        master_td = get_thread_data();
-        pkg = (sigcxt_pkg_t *)malloc(sizeof(sigcxt_pkg_t));
-        memcpy(pkg, info->sigcxt_pkg, sizeof(sigcxt_pkg_t));
+        /* Fill the internal signal framwork */
+        pkg = (sigcxt_pkg_t *)info->sigcxt_pkg;
+        memcpy(pkg, ms, sizeof(sigcxt_pkg_t));
 
         memset(&pkg->ctx.uc_mcontext, 0, sizeof(mcontext_t));
         pkg->ctx.uc_mcontext.gregs[SIGCXT_R8] = info->cpu_context.REG(8);
@@ -548,15 +454,16 @@ trts_handle_exception(void *tcs, void *ms)
         pkg->ctx.uc_link = NULL;
 
         ssa_gpr->REG(ip) = (size_t)internal_handle_DBI_inside_signal; // The signal is triggered by App's code?
-
-        master_td->signal_frame = pkg;
     }
-    /* End: Added by Pinghai */
+    else if (ssa_gpr->exit_info.valid == 1)
+    {
+        ssa_gpr->REG(ip) = (size_t)internal_handle_exception; // prepare the ip for 2nd phrase handling
+    }
 
-    ssa_gpr->REG(sp) = (size_t)new_sp;      // new stack for internal_handle_exception
+    /* End: Added by Pinghai */
+    ssa_gpr->REG(sp) = (size_t)get_sdk_signal_stack();      // Reuse SDK stack for ERESUMEing to internal_handle_exception
     ssa_gpr->REG(ax) = (size_t)info;        // 1st parameter (info) for LINUX32
     ssa_gpr->REG(di) = (size_t)info;        // 1st parameter (info) for LINUX64, LINUX32 also uses it while restoring the context
-    *new_sp = info->cpu_context.REG(ip);    // for debugger to get call trace
 
     //mark valid to 0 to prevent eenter again
     ssa_gpr->exit_info.valid = 0;
@@ -572,35 +479,35 @@ default_handler:
 /* Don't modify the order of RSP */
 typedef struct _simu_pt_gregs
 {
-    ulong r8;
-    ulong r9;
-    ulong r10;
-    ulong r11;
-    ulong r12;
-    ulong r13;
-    ulong r14;
-    ulong r15;
-
-    ulong rdi;
-    ulong rsi;
-    ulong rbp;
-    ulong rbx;
-    ulong rdx;
-    ulong rax;
-    ulong rcx;
-    ulong rsp;
+    ulong r8, r9, r10, r11, r12, r13, r14, r15;
+    ulong rdi, rsi, rbp, rbx, rdx, rax, rcx, rsp;
 } simu_pt_gregs;
 
 /* handler signals triggerred outside-sgx enclave */
 extern "C"
 void internal_handle_DBI_outside_signal(simu_pt_gregs *regs)
 {
-    sgx_exception_info_t info;
-    thread_data_t *master_td;
-    sigcxt_pkg_t *pkg;
+    thread_data_t *thread_data = get_thread_data();
+    sgx_exception_info_t *info = (sgx_exception_info_t *)thread_data->signal_info;
+    sigcxt_pkg_t *pkg = (sigcxt_pkg_t *)info->sigcxt_pkg;
 
-    master_td = get_thread_data();
-    pkg = (sigcxt_pkg_t *)master_td->signal_frame;
+    /* initialize info */
+    info->cpu_context.r8 = regs->r8;
+    info->cpu_context.r9 = regs->r9;
+    info->cpu_context.r10 = regs->r10;
+    info->cpu_context.r11 = regs->r11;
+    info->cpu_context.r12 = regs->r12;
+    info->cpu_context.r13 = regs->r13;
+    info->cpu_context.r14 = regs->r14;
+    info->cpu_context.r15 = regs->r15;
+
+    info->cpu_context.rax = regs->rax;
+    info->cpu_context.rcx = regs->rcx;
+    info->cpu_context.rdx = regs->rdx;
+    info->cpu_context.rbx = regs->rbx;
+    info->cpu_context.rbp = regs->rbp;
+    info->cpu_context.rsi = regs->rsi;
+    info->cpu_context.rdi = regs->rdi;
 
     /* update the signal framwork, except rsp and rip */
     pkg->ctx.uc_mcontext.gregs[SIGCXT_R8] = regs->r8;
@@ -620,40 +527,19 @@ void internal_handle_DBI_outside_signal(simu_pt_gregs *regs)
     pkg->ctx.uc_mcontext.gregs[SIGCXT_RCX] = regs->rcx;
     pkg->ctx.uc_link = NULL;
 
+    // +8 because continue_execution creates a return_address on the stack
+    info->cpu_context.REG(sp) = pkg->ctx.uc_mcontext.gregs[SIGCXT_RSP] + 8;
+    info->cpu_context.REG(ip) = pkg->ctx.uc_mcontext.gregs[SIGCXT_RIP];
 
-    /* initialize info */
-    info.sigcxt_pkg = pkg;
-    info.cpu_context.r8 = regs->r8;
-    info.cpu_context.r9 = regs->r9;
-    info.cpu_context.r10 = regs->r10;
-    info.cpu_context.r11 = regs->r11;
-    info.cpu_context.r12 = regs->r12;
-    info.cpu_context.r13 = regs->r13;
-    info.cpu_context.r14 = regs->r14;
-    info.cpu_context.r15 = regs->r15;
-
-    info.cpu_context.rax = regs->rax;
-    info.cpu_context.rcx = regs->rcx;
-    info.cpu_context.rdx = regs->rdx;
-    info.cpu_context.rbx = regs->rbx;
-    info.cpu_context.rbp = regs->rbp;
-    info.cpu_context.rsi = regs->rsi;
-    info.cpu_context.rdi = regs->rdi;
-
-    info.cpu_context.REG(sp) = pkg->ctx.uc_mcontext.gregs[SIGCXT_RSP] + 8;    // continue_execution create a return_address
-    info.cpu_context.REG(ip) = pkg->ctx.uc_mcontext.gregs[SIGCXT_RIP];
-
-    master_td->signal_frame = NULL;
-   _internal_handle_exception(&info, true);
+   _internal_handle_exception(info, true);
 }
 
 extern "C"
 void function_container_651(void)
 {
     __asm__(
-        "callwrapper_internal_handle_DBI_outside_signal:\n\t"
-        // "call 1f\n"
-        // "1:\n\t"
+        "stacK_hook_2_signal_handler:\n\t"
+        /* Save current machine context, refer simu_pt_gregs */
         "push  %rsp\n\t"
         "push  %rcx\n\t"
         "push  %rax\n\t"
@@ -671,26 +557,31 @@ void function_container_651(void)
         "push  %r10\n\t"
         "push  %r9\n\t"
         "push  %r8\n\t"
-
-        "mov %rsp, %rdi\n\t"
+        "call  get_sdk_signal_stack\n\t"
+        /* let internal_handle_DBI_outside_signal works on SDK's signal stack*/
+        "xchg  %rsp, %rax\n\t"
+        "mov   %rax, %rdi\n\t"
         "call  internal_handle_DBI_outside_signal\n\t");
+    // doesn't come to here
 }
 
-extern "C" void callwrapper_internal_handle_DBI_outside_signal();
-extern "C" void oret_load_slave_tls(void);
+extern "C" void stacK_hook_2_signal_handler();
+
 /* exception triggered when running out-sgx code */
 extern "C" sgx_status_t trts_handle_outside_signal(void *tcs, void *ms)
 {
-    // Inject a signal framework on dynamorio's signal stack
-    // 1. Get dynamorio's signal stack
-    // 2. Inject the signal frame in that stack
+    // Inject a signal-info framework into SGX-XDBI's execution flow
+    // 1. Get DBI's execution stack
     // 2. Get the return address of the latest do_ocall
-    // 3. Save the return address to TCS
-    // 4. Replace the return address with address of function switch_stack_call_dr_signal_handler
-    thread_data_t *master_td = get_thread_data();
-    ocall_context_t *ocall_cxt;
-    uintptr_t *stack_ret;
-    sigcxt_pkg_t *pkg;
+    // 3. Save the return address into the signal-info frame
+    // 4. Replace the return address with address of stacK_hook_2_signal_handler
+    thread_data_t *thread_data = get_thread_data();
+    sgx_exception_info_t *info = (sgx_exception_info_t *)thread_data->signal_info;
+    sigcxt_pkg_t *pkg = (sigcxt_pkg_t *)info->sigcxt_pkg;
+
+    ocall_context_t *ocall_cxt = NULL;
+    uintptr_t *stack_ret = NULL;
+
 
     if (tcs == NULL)
         goto default_handler;
@@ -705,12 +596,10 @@ extern "C" sgx_status_t trts_handle_outside_signal(void *tcs, void *ms)
         goto default_handler;
 
     /* Refer to trts_pic.S::do_ocall, the ocall consums 0x408 bytes on stack */
-    ocall_cxt = (ocall_context_t*)master_td->last_sp;
+    ocall_cxt = (ocall_context_t*)thread_data->last_sp;
     stack_ret = (uintptr_t*)(ocall_cxt->xbp + sizeof(uintptr_t));
 
-    /* create an internal copy of the signal framwork and update it */
-    pkg = (sigcxt_pkg_t *)malloc(sizeof(sigcxt_pkg_t));
-
+    /* Fill the internal copy of the signal framwork and update it */
     memcpy(pkg, ms, sizeof(sigcxt_pkg_t));
 
     memset(&pkg->ctx.uc_mcontext, 0, sizeof(mcontext_t));
@@ -718,10 +607,7 @@ extern "C" sgx_status_t trts_handle_outside_signal(void *tcs, void *ms)
     pkg->ctx.uc_mcontext.gregs[SIGCXT_RIP] = (long long)*stack_ret;
     pkg->ctx.uc_link = NULL;
 
-    *stack_ret = (uintptr_t)callwrapper_internal_handle_DBI_outside_signal;
-    master_td->signal_frame = pkg;
-
-    oret_load_slave_tls();
+    *stack_ret = (uintptr_t)stacK_hook_2_signal_handler;
 
     return SGX_SUCCESS;
 

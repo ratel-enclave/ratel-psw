@@ -77,15 +77,14 @@ sgx_status_t sgx_ocall(const unsigned int index, void *ms)
     return status;
 }
 
-
 extern "C"
-uintptr_t update_ocall_lastsp(ocall_context_t* context)
+uintptr_t update_ocall_lastsp(ocall_context_t *context)
 {
     thread_data_t *thread_data = get_thread_data();
-    uintptr_t cur_sp = thread_data->last_sp;
+    uintptr_t last_sp = thread_data->last_sp;
 
-    context->pre_last_sp = cur_sp;
-    if (context->pre_last_sp == thread_data->stack_base_SDK)
+    context->pre_last_sp = last_sp;
+    if (context->pre_last_sp == thread_data->stack_base_addr)
     {
         context->ocall_depth = 1;
     }
@@ -96,19 +95,10 @@ uintptr_t update_ocall_lastsp(ocall_context_t* context)
         ocall_context_t *context_pre = reinterpret_cast<ocall_context_t *>(context->pre_last_sp);
         context->ocall_depth = context_pre->ocall_depth + 1;
     }
+
     thread_data->last_sp = reinterpret_cast<uintptr_t>(context);
 
-    /* Update last_sp_SDK: *(last_sp_SDK-8) -> ret_u. Please refer enclave_entry */
-    uintptr_t cur_sp_SDK = thread_data->last_sp_SDK;
-    uintptr_t next_sp = reinterpret_cast<uintptr_t>(context);
-
-    /* SDK stack is located at the highest address space */
-    if (next_sp > thread_data->stack_base_DBI)
-        thread_data->last_sp_SDK = next_sp;     // Will be used by enclave_entry
-    else
-        thread_data->last_sp_DBI = next_sp;     // Will be used by call_switch_stack_to_DBI
-
-    return cur_sp_SDK;
+    return last_sp;
 }
 
 /* Begin: Modified by Pinghai */
@@ -117,35 +107,23 @@ sgx_status_t do_oret(void *ms)
 {
     thread_data_t *thread_data = get_thread_data();
     uintptr_t last_sp = thread_data->last_sp;
-    ocall_context_t *context = reinterpret_cast<ocall_context_t*>(last_sp);
-    uintptr_t stack_base;
-
-    if (last_sp > thread_data->stack_base_DBI)
-        stack_base = thread_data->stack_base_SDK;
-    else
-        stack_base = thread_data->stack_base_DBI;
-
-    if (0 == last_sp || stack_base <= (uintptr_t)context || thread_data->stack_base_SDK <= (uintptr_t)&context)
+    ocall_context_t *context = reinterpret_cast<ocall_context_t*>(thread_data->last_sp);
+    if(0 == last_sp || last_sp <= (uintptr_t)&context)
     {
         return SGX_ERROR_UNEXPECTED;
     }
     // At least 1 ecall frame and 1 ocall frame are expected on stack.
     // 30 is an estimated value: 8 for enclave_entry and 22 for do_ocall.
-    if (last_sp > stack_base - 30 * sizeof(size_t))
+    if(last_sp > thread_data->stack_base_addr - 30 * sizeof(size_t))
     {
         return SGX_ERROR_UNEXPECTED;
     }
-    if (context->ocall_flag != OCALL_FLAG)
+    if(context->ocall_flag != OCALL_FLAG)
     {
         return SGX_ERROR_UNEXPECTED;
     }
-
-    if (context->pre_last_sp > thread_data->stack_base_DBI)
-        stack_base = thread_data->stack_base_SDK;
-    else
-        stack_base = thread_data->stack_base_DBI;
-
-    if (context->pre_last_sp > stack_base || stack_base <= (uintptr_t)context)
+    if(context->pre_last_sp > thread_data->stack_base_addr
+       || context->pre_last_sp <= (uintptr_t)context)
     {
         return SGX_ERROR_UNEXPECTED;
     }

@@ -63,7 +63,7 @@ typedef struct _eenter_frame_t
     uintptr_t ccsa;
     uintptr_t xsp_u;
     uintptr_t xbp_u;
-    uintptr_t ret_u; // <-- last_sp_SDK - 8
+    uintptr_t ret_u; // <-- last_sp - 8
 } eenter_frame_t;
 /* End: Added by Pinghai */
 

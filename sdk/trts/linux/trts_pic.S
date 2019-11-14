@@ -109,6 +109,7 @@ DECLARE_GLOBAL_FUNC enclave_entry
  *      edi >=  0 - ecall
  *      edi == -1 - do_init_enclave
  *      edi == -2 - oret
+ *      edi == -4 - trts_handle_outside_signal
  * Registers
  *      No need to use any register during the dipatch
  * ----------------------------------------------------------------------
@@ -116,8 +117,10 @@ DECLARE_GLOBAL_FUNC enclave_entry
     .cfi_startproc
     cmp     $0, %xax
     jne     .Ldo_handler                /* handle exception state */
+    cmp     $-4, %xdi
+    jz      .Ldo_handler                /* handle signals triggered outside */
     xor     %xdx, %xdx
-    READ_MASTER_TLS_DATA last_sp_SDK
+    READ_MASTER_TLS_DATA last_sp
     cmp     $0, %xax
     jne .Lswitch_stack
     GET_STACK_BASE  %xbx                /* if last_sp == 0, set sp to stack base */
@@ -613,7 +616,7 @@ DECLARE_LOCAL_FUNC call_switch_stack_to_DBI
 
     /* Backup before jumping to callee */
     /* Step 1: get stack TOS of DBI */
-    mov     %fs:last_sp_DBI, %xbx
+    mov     %fs:last_sp, %xbx
 
     /* Step 2: swtich stack */
     xchg    %xsp, %xbx

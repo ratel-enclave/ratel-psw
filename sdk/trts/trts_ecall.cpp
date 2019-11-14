@@ -43,8 +43,9 @@
 #include "trts_inst.h"
 #include "trts_emodpr.h"
 #include "metadata.h"
-#  include "linux/elf_parser.h"
-#  define GET_TLS_INFO  elf_tls_info
+#include "linux/elf_parser.h"
+
+#define GET_TLS_INFO elf_tls_info
 
 // is_ecall_allowed()
 // check the index in the dynamic entry table
@@ -205,9 +206,9 @@ void relocate_eenter_frame(eenter_frame_t *dst)
     thread_data_t *thread_data = get_thread_data();
     eenter_frame_t *src;
 
-    src = (eenter_frame_t *)(thread_data->last_sp_SDK - sizeof(eenter_frame_t));
+    src = (eenter_frame_t *)(thread_data->last_sp - sizeof(eenter_frame_t));
     memcpy(dst, src, sizeof(eenter_frame_t));
-    thread_data->last_sp_SDK = (uintptr_t)dst + sizeof(eenter_frame_t);
+    thread_data->last_sp = (uintptr_t)dst + sizeof(eenter_frame_t);
 }
 
 extern "C" void ecall_reset_tls_reg(void);
@@ -222,7 +223,7 @@ static sgx_status_t trts_ecall(uint32_t ordinal, void *ms)
     if (unlikely(g_is_first_ecall))
     {
         // The thread performing the global initialization cannot do a nested ECall
-        if (thread_data->last_sp_SDK != thread_data->stack_base_SDK)
+        if (thread_data->last_sp != thread_data->stack_base_addr)
         { // nested ecall
             return SGX_ERROR_ECALL_NOT_ALLOWED;
         }
@@ -254,8 +255,7 @@ static sgx_status_t trts_ecall(uint32_t ordinal, void *ms)
     if (status == SGX_SUCCESS)
     {
         ecall_func_t func = (ecall_func_t)addr;
-        // status = func(ms);
-        status = call_switch_stack_to_DBI(ms, func);
+        status = func(ms);
     }
 
     /* Anyway, the TLS segments should be restored to master-tls*/
@@ -285,8 +285,8 @@ static bool is_utility_thread()
 
 /* Begin: Added by Pinghai */
 #define TLS_TYPE_TCS_TD     0x1      // Use bit 1
-
 #define PAGE_SIZE   4096
+
 static void init_master_tls(void* tcs, thread_data_t *td)
 {
     size_t stack_guard = td->stack_guard;
@@ -301,27 +301,9 @@ static void init_master_tls(void* tcs, thread_data_t *td)
     td->tls_array += (size_t)tcs;
     td->tls_addr += (size_t)tcs;
 
-    /* Begin: Added by Pinghai. Don't change the order */
-    /* Sperate two stacks for SDK & DBI, leave only 4 higer pages for SDK stack */
-    td->last_sp_SDK = td->last_sp;
-    td->stack_base_SDK = td->last_sp_SDK;
-
-    td->last_sp_DBI = td->last_sp_SDK - 4 * PAGE_SIZE;
-    td->stack_base_DBI = td->last_sp_DBI;
-    /* End: Added by Pinghai. */
-
-    /* Begin: Modified by Pinghai */
     /* Create read-zone on stack */
-    td->last_sp_SDK -= (size_t)STATIC_STACK_SIZE;
-    td->stack_base_SDK -= (size_t)STATIC_STACK_SIZE;
-
-    td->last_sp_DBI -= (size_t)STATIC_STACK_SIZE;
-    td->stack_base_DBI -= (size_t)STATIC_STACK_SIZE;
-
-    td->last_sp = td->last_sp_SDK;
-    td->stack_base_addr = td->stack_base_SDK;
-    /* End: Modified by Pinghai */
-
+    td->last_sp -= (size_t)STATIC_STACK_SIZE;
+    td->stack_base_addr -= (size_t)STATIC_STACK_SIZE;
 
     td->stack_guard = stack_guard;
     td->flags = thread_flags;
@@ -346,6 +328,8 @@ extern "C" void init_slave_tls(void *tls_segment)
 }
 /* End: Added by Pinghai */
 
+extern "C" void initialize_signal_frame(thread_data_t *td);
+
 sgx_status_t do_init_thread(void *tcs)
 {
     thread_data_t *thread_data = GET_PTR(thread_data_t, tcs, g_global_data.td_template.self_addr);
@@ -359,6 +343,7 @@ sgx_status_t do_init_thread(void *tcs)
 
     /* Begin: Modified by Pinghai */
     init_master_tls(tcs, thread_data);
+    initialize_signal_frame(thread_data);
     /* End: Modified by Pinghai */
 
 #ifndef SE_SIM
@@ -459,6 +444,8 @@ sgx_status_t do_ecall_add_thread(void *ms, void *tcs)
     return status;
 }
 
+extern "C"
+void finalize_signal_frame(thread_data_t *td);
 // do_uninit_enclave()
 //      Run the global uninitialized functions when the enclave is destroyed.
 // Parameters:
@@ -480,6 +467,10 @@ sgx_status_t do_uninit_enclave(void *tcs)
 
     while (tcs_node != NULL)
     {
+        tcs_t *del_tcs = (tcs_t*)tcs_node->tcs;
+        initialize_signal_frame((thread_data_t*)del_tcs->ofs_base); /* fix-me */
+
+
         if (DEC_TCS_POINTER(tcs_node->tcs) == tcs)
         {
             tcs_node_t *tmp = tcs_node;
@@ -498,6 +489,7 @@ sgx_status_t do_uninit_enclave(void *tcs)
 
         tcs_node_t *tmp = tcs_node;
         tcs_node = tcs_node->next;
+
         free(tmp);
     }
 

@@ -55,7 +55,7 @@
 #define SGX_ERROR_ENCLAVE_CRASHED     0x000001006 // enclave is crashed
 #define SGX_ERROR_STACK_OVERRUN       0x000001009 // enclave is running out of stack
 
-#define STATIC_STACK_SIZE   688
+#define STATIC_STACK_SIZE   688 + 4096*2
 
 /* Thread Data
  * c.f. data structure defintion for thread_data_t in `rts.h'.
@@ -70,12 +70,8 @@
 
 /* Begin: Added by Pinghai */
 #define master_tls			(SE_WORDSIZE *20)
-#define last_sp_SDK			(SE_WORDSIZE *21)
-#define stack_base_SDK      (SE_WORDSIZE *22)
-#define last_sp_DBI			(SE_WORDSIZE *23)
-#define stack_base_DBI      (SE_WORDSIZE *24)
-#define cur_fs_seg			(SE_WORDSIZE *25)
-#define cur_gs_seg			(SE_WORDSIZE *26)
+#define cur_fs_seg			(SE_WORDSIZE *21)
+#define cur_gs_seg			(SE_WORDSIZE *22)
 
 #define TLS_TYPE_TCS_TD     0x1      // Use bit 0
 /* End: Added by Pinghai */

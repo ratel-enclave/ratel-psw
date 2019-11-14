@@ -67,10 +67,6 @@ const volatile global_data_t
                       {0, 0, 0, 0, 0, 0}, // cxx_thread_info
                       0,                  // stack_commit_addr
                       NULL,               // master-tls
-                      0,                  // last_sp_SDK
-                      0,                  // stack_base_SDK
-                      0,                  // last_sp_DBI
-                      0,                  // stack_base_DBI
                       NULL,               // cur_fs
                       NULL,               // cur_gs
                       NULL,
@@ -188,17 +184,14 @@ sgx_status_t do_init_enclave(void *ms, void *tcs)
         return SGX_ERROR_UNEXPECTED;
     }
 
-#ifndef SE_SIM
     thread_data_t *thread_data = GET_PTR(thread_data_t, tcs, g_global_data.td_template.self_addr);
+
     if (thread_data == NULL)
     {
         return SGX_ERROR_UNEXPECTED;
     }
 
-    do_init_thread(tcs);
-    thread_data->flags = SGX_UTILITY_THREAD;
-
-
+#ifndef SE_SIM
     /* for EDMM, we need to accept the trimming of the POST_REMOVE pages. */
     if (EDMM_supported)
     {
@@ -213,6 +206,9 @@ sgx_status_t do_init_enclave(void *ms, void *tcs)
     {
         memset_s(GET_PTR(void, enclave_base, g_global_data.heap_offset), g_global_data.heap_size, 0, g_global_data.heap_size);
     }
+
+    do_init_thread(tcs);
+    thread_data->flags = SGX_UTILITY_THREAD;
 
     g_enclave_state = ENCLAVE_INIT_DONE;
 	/* Begin: Added by Pinghai */
