@@ -30,7 +30,7 @@ Build and Install the Intel(R) SGX Driver
 -----------------------------------------
 Follow the instructions in the [linux-sgx-driver](https://github.com/01org/linux-sgx-driver) project to build and install the Intel(R) SGX driver.
 
-Build the Intel(R) SGX SDK and Intel(R) SGX PSW Package
+Build the Intel(R) SGX PSW Package
 -------------------------------------------------------
 ### Prerequisites:
 - Ensure that you have one of the following required operating systems:  
@@ -40,21 +40,6 @@ Build the Intel(R) SGX SDK and Intel(R) SGX PSW Package
   * CentOS 7.4.1708 64bits
   * SUSE Linux Enterprise Server 12 64bits
 
-- Use the following command(s) to install the required tools to build the Intel(R) SGX SDK:  
-  * On Ubuntu 16.04:
-  ```
-    $ sudo apt-get install build-essential ocaml automake autoconf libtool wget python
-  ```
-  * On Red Hat Enterprise Linux 7.4 and CentOS 7.4:
-  ```
-    $ sudo yum groupinstall 'Development Tools'
-    $ sudo yum install ocaml wget python
-  ```
-  * On SUSE Linux Enterprise Server 12:
-  ```
-    $ sudo zypper install --type pattern devel_basis
-    $ sudo zypper install ocaml ocaml-ocamlbuild automake autoconf libtool wget python
-  ```
 - Use the following command to install additional required tools to build the Intel(R) SGX PSW:  
   * On Ubuntu 16.04:
   ```
@@ -74,9 +59,9 @@ Build the Intel(R) SGX SDK and Intel(R) SGX PSW Package
   $ ./download_prebuilt.sh
 ```
 
-### Build the Intel(R) SGX SDK and Intel(R) SGX PSW
-The following steps describe how to build the Intel(R) SGX SDK and PSW. You can build the project according to your requirements.  
-- To build both Intel(R) SGX SDK and PSW with default configuration, enter the following command:  
+### Build the Intel(R) SGX PSW
+The following steps describe how to build the Intel(R) SGX PSW. You can build the project according to your requirements.  
+- To build both Intel(R) SGX PSW with default configuration, enter the following command:  
 ```
   $ make  
 ```  
@@ -91,7 +76,7 @@ The following steps describe how to build the Intel(R) SGX SDK and PSW. You can 
 ```
   **Note**: Building the Intel(R) SGX PSW with open sourced SGXSSL/string/math libraries is not supported. The above command builds Intel(R) SGX SDK only and the build of PSW part will be skipped.
 
-- To build Intel(R) SGX SDK and PSW with debug information, enter the following command:  
+- To build Intel(R) SGX PSW with debug information, enter the following command:  
 ```
   $ make DEBUG=1
 ```
@@ -101,23 +86,11 @@ The following steps describe how to build the Intel(R) SGX SDK and PSW. You can 
 ```
 
 - The build above uses prebuilt Intel(R) Architecture Enclaves(LE/PvE/QE/PCE/PSE-OP/PSE-PR) and applet(PSDA) - the files ``psw/ae/data/prebuilt/libsgx_*.signed.so`` and ``psw/ae/data/prebuilt/PSDA.dalp``, which have been signed by Intel in advance.
-  To build those enclaves by yourself (without a signature), first you need to build both Intel(R) SGX SDK and PSW with the default configuration. After that, you can build each Architecture Enclave by using the `make` command from the corresponding folder:
+  To build those enclaves by yourself (without a signature), first you need to build both Intel(R) SGX PSW with the default configuration. After that, you can build each Architecture Enclave by using the `make` command from the corresponding folder:
 ```
   $ cd psw/ae/le
   $ make
 ``` 
-
-### Build the Intel(R) SGX SDK Installer
-To build the Intel(R) SGX SDK installer, enter the following command:
-```
-$ make sdk_install_pkg
-```
-You can find the generated Intel(R) SGX SDK installer ``sgx_linux_x64_sdk_${version}.bin`` located under `linux/installer/bin/`, where `${version}` refers to the version number.
-
-**Note**: The above command builds the Intel(R) SGX SDK with default configuration firstly and then generates the target SDK Installer. To build the Intel(R) SGX SDK Installer with debug information kept in the tools and libraries, enter the following command:
-```
-$ make sdk_install_pkg DEBUG=1
-```
 
 ### Build the Intel(R) SGX PSW Installer
 To build the Intel(R) SGX PSW installer, enter the following command:
@@ -126,69 +99,11 @@ $ make psw_install_pkg
 ```
 You can find the generated Intel(R) SGX PSW installer ``sgx_linux_x64_psw_${version}.bin`` located under `linux/installer/bin/`, where `${version}` refers to the version number.
 
-**Note**: The above command builds the Intel(R) SGX SDK and PSW with default configuration firstly and then generates the target PSW Installer. To build the Intel(R) SGX PSW Installer with debug information kept in the tools and libraries, enter the following command:
+**Note**: The above command builds the Intel(R) SGX PSW with default configuration firstly and then generates the target PSW Installer. To build the Intel(R) SGX PSW Installer with debug information kept in the tools and libraries, enter the following command:
 ```
 $ make psw_install_pkg DEBUG=1
 ```
 
-
-Install the Intel(R) SGX SDK
-------------------------
-### Prerequisites
-- Ensure that you have one of the following operating systems:  
-  * Ubuntu\* 16.04.3 LTS Desktop 64bits
-  * Ubuntu\* 16.04.3 LTS Server 64bits
-  * Red Hat Enterprise Linux Server release 7.4 64bits
-  * CentOS 7.4.1708 64bits
-  * SUSE Linux Enterprise Server 12 64bits
-- Use the following command to install the required tool to use Intel(R) SGX SDK:
-  * On Ubuntu 16.04:
-  ```  
-    $ sudo apt-get install build-essential python
-  ```
-  * On Red Hat Enterprise Linux 7.4 and CentOS 7.4:
-  ```
-     $ sudo yum groupinstall 'Development Tools'
-     $ sudo yum install python 
-  ```
-  * On SUSE Linux Enterprise Server 12:
-  ```
-     $ sudo zypper install --type pattern devel_basis
-     $ sudo zypper install python 
-  ```
-
-### Install the Intel(R) SGX SDK
-To install the Intel(R) SGX SDK, invoke the installer, as follows:
-```
-$ cd linux/installer/bin
-$ ./sgx_linux_x64_sdk_${version}.bin 
-```
-NOTE: You need to set up the needed environment variables before compiling your code. To do so, run:  
-```  
-  $ source ${sgx-sdk-install-path}/environment  
-```  
-
-### Test the Intel(R) SGX SDK Package with the Code Samples
-- Compile and run each code sample in Simulation mode to make sure the package works well:    
-```
-  $ cd SampleCode/LocalAttestation
-  $ make SGX_MODE=SIM
-  $ ./app
-```
-   Use similar commands for other sample codes.
-
-### Compile and Run the Code Samples in the Hardware Mode
-If you use an Intel SGX hardware enabled machine, you can run the code samples in Hardware mode.
-Ensure that you install Intel(R) SGX driver and Intel(R) SGX PSW installer on the machine.  
-See the earlier topic, *Build and Install the Intel(R) SGX Driver*, for information on how to install the Intel(R) SGX driver.  
-See the later topic, *Install Intel(R) SGX PSW*, for information on how to install the PSW package.
-- Compile and run each code sample in Hardware mode, Debug build, as follows:  
-```
-  $ cd SampleCode/LocalAttestation
-  $ make
-  $ ./app
-```
-   Use similar commands for other code samples.
 
 Install the Intel(R) SGX PSW
 ----------------------------
