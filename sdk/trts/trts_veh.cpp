@@ -383,6 +383,7 @@ trts_handle_exception(void *tcs, void *ms)
     sp = ssa_gpr->REG(sp);
     if(!is_stack_addr((void*)sp, 0))  // check stack overrun only, alignment will be checked after exception handled
     {
+        assert(false && "trts_handle_exception -->> SGX_ERROR_STACK_OVERRUN!!!");
         g_enclave_state = ENCLAVE_CRASHED;
         return SGX_ERROR_STACK_OVERRUN;
     }

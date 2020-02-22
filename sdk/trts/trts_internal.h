@@ -33,6 +33,9 @@
 
 #include "util.h"
 
+// #define STACK_EXTENDED_SIZE     0x2000
+// #define STATIC_STACK_SIZE       688 + STACK_EXTENDED_SIZE
+// #define STACK_EXTENDED_OFFSET   0x4000
 #define STATIC_STACK_SIZE   688
 
 #define TD2TCS(td) ((const void *)(((thread_data_t*)(td))->stack_base_addr + (size_t)STATIC_STACK_SIZE + (size_t)SE_GUARD_PAGE_SIZE))

@@ -55,6 +55,8 @@
 #define SGX_ERROR_ENCLAVE_CRASHED     0x000001006 // enclave is crashed
 #define SGX_ERROR_STACK_OVERRUN       0x000001009 // enclave is running out of stack
 
+// #define STACK_EXTENDED_SIZE     0x2000
+// #define STATIC_STACK_SIZE   688 + STACK_EXTENDED_SIZE
 #define STATIC_STACK_SIZE   688
 
 /* Thread Data
@@ -163,16 +165,6 @@
     sub      $SE_GUARD_PAGE_SIZE, %xax
 .endm
 
-//cdd
-// .macro PUSH_GPR
-//     push    %xcx
-//  .endm
-
-
-// .macro POP_GPR
-//     pop    %xcx
-// .endm
-
 .macro PUSH_GPR
     push    %xax
     push    %xdi
@@ -193,4 +185,3 @@
     pop    %xdi
     pop    %xax
 .endm
-//ddc

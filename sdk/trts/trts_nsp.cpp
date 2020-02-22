@@ -219,6 +219,7 @@ int enter_enclave(int index, void *ms, void *tcs, int cssa)
         error = trts_handle_exception(tcs, ms);
         if (check_static_stack_canary(tcs) != 0)
         {
+            assert(false && "enter_enclave -->> SGX_ERROR_STACK_OVERRUN!!!\n");
             error = SGX_ERROR_STACK_OVERRUN;
         }
     }
