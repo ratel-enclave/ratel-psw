@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2018-2020 Ratel Authors.  All rights reserved.
  * Copyright (C) 2011-2018 Intel Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -54,7 +55,7 @@ uint64_t g_cpu_feature_indicator = 0;
 int EDMM_supported = 0;
 sdk_version_t g_sdk_version = SDK_VERSION_1_5;
 
-/* Begin: Modified by Pinghai */
+/* Begin: Modified by ratel authors */
 /* NULL values corresponding to master_tls -> signal_frame */
 const volatile global_data_t
     g_global_data = {1, 2, 3, 4, // enclave_size, heap_offset, heap_size
@@ -75,13 +76,13 @@ const volatile global_data_t
                      0,
                      0,
                      {{{0, 0, 0, 0, 0, 0, 0}}}};
-/* End: Modified by Pinghai */
+/* End: Modified by ratel authors */
 
 uint32_t g_enclave_state = ENCLAVE_INIT_NOT_STARTED;
 
-/* Begin: Added by Pinghai */
+/* Begin: Added by ratel authors */
 void* g_enclave_image_base = NULL;
-/* End: Added by Pinghai */
+/* End: Added by ratel authors */
 
 extern "C"
 {
@@ -211,9 +212,9 @@ sgx_status_t do_init_enclave(void *ms, void *tcs)
     thread_data->flags = SGX_UTILITY_THREAD;
 
     g_enclave_state = ENCLAVE_INIT_DONE;
-	/* Begin: Added by Pinghai */
+	/* Begin: Added by ratel authors */
     g_enclave_image_base = enclave_base;
-	/* End: Added by Pinghai */
+	/* End: Added by ratel authors */
     return SGX_SUCCESS;
 }
 

@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2018-2020 Ratel Authors.  All rights reserved.
  * Copyright (C) 2011-2018 Intel Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -183,7 +184,7 @@ static int check_dynamic_range(void *addr, size_t page_count, size_t *offset, st
     if (0 == check_dynamic_entry_range(addr, page_count, LAYOUT_ID_HEAP_INIT, 0, fa))
         return 0;
 
-	/* Begin: Added by Pinghai */
+	/* Begin: Added by ratel authors */
     // check code cache
     if (0 == check_dynamic_entry_range(addr, page_count, LAYOUT_ID_DYRIO_CODE_CACHE, 0, fa))
         return 0;
@@ -191,7 +192,7 @@ static int check_dynamic_range(void *addr, size_t page_count, size_t *offset, st
     // check prog_modls
     if (0 == check_dynamic_entry_range(addr, page_count, LAYOUT_ID_SGXEV_PROG_ARENA, 0, fa))
         return 0;
-	/* End: Added by Pinghai */
+	/* End: Added by ratel authors */
 
     // check dynamic thread entries range
     if (NULL != (dt_layout = get_dynamic_layout_by_id(LAYOUT_ID_THREAD_GROUP_DYN)))

@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2018-2020 Ratel Authors.  All rights reserved.
  * Copyright (C) 2011-2018 Intel Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -101,7 +102,7 @@ uintptr_t update_ocall_lastsp(ocall_context_t *context)
     return last_sp;
 }
 
-/* Begin: Modified by Pinghai */
+/* Begin: Modified by ratel authors */
 extern "C" void oret_load_slave_tls(void);
 sgx_status_t do_oret(void *ms)
 {
@@ -137,4 +138,4 @@ sgx_status_t do_oret(void *ms)
     // Should not come here
     return SGX_ERROR_UNEXPECTED;
 }
-/* End: Modified by Pinghai */
+/* End: Modified by ratel authors */

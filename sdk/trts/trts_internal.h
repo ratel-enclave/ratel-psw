@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2018-2020 Ratel Authors.  All rights reserved.
  * Copyright (C) 2011-2018 Intel Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -56,7 +57,7 @@ typedef struct {
     uint8_t entry_table[1];
 } entry_table_t;
 
-/* Begin: Added by Pinghai */
+/* Begin: Added by ratel authors */
 typedef struct _eenter_frame_t
 {
     uintptr_t ret_enter_enclave;
@@ -68,7 +69,7 @@ typedef struct _eenter_frame_t
     uintptr_t xbp_u;
     uintptr_t ret_u; // <-- last_sp - 8
 } eenter_frame_t;
-/* End: Added by Pinghai */
+/* End: Added by ratel authors */
 
 #ifdef __cplusplus
 extern "C" {
@@ -86,9 +87,9 @@ sgx_status_t do_init_enclave(void *ms, void *tcs);
 sgx_status_t do_ecall(int index, void *ms, void *tcs);
 sgx_status_t do_oret(void *ms);
 sgx_status_t trts_handle_exception(void *tcs, void *ms);
-/* Begin: Added by Pinghai */
+/* Begin: Added by ratel authors */
 sgx_status_t trts_handle_outside_signal(void *tcs, void *ms);
-/* End: Added by Pinghai */
+/* End: Added by ratel authors */
 sgx_status_t do_ecall_add_thread(void *ms, void *tcs);
 sgx_status_t do_uninit_enclave(void *tcs);
 int check_static_stack_canary(void *tcs);

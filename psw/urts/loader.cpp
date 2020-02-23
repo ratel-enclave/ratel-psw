@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2018-2020 Ratel Authors.  All rights reserved.
  * Copyright (C) 2011-2018 Intel Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -835,10 +836,10 @@ int CLoader::set_context_protection(layout_t *layout_start, layout_t *layout_end
             }
             else
             {
-				/* Begin: Modified by Pinghai */
+				/* Begin: Modified by ratel authors */
                 // prot = SI_FLAGS_RW & SI_MASK_MEM_ATTRIBUTE;
                 prot = (int)((SI_FLAGS_RW | layout->entry.si_flags) & SI_MASK_MEM_ATTRIBUTE);
-				/* End: Modified by Pinghai */
+				/* End: Modified by ratel authors */
 #ifndef SE_SIM
 
                 //when a page is eremoved when loading, we should set this page to none access.

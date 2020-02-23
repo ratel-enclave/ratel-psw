@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2018-2020 Ratel Authors.  All rights reserved.
  * Copyright (C) 2011-2018 Intel Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -665,7 +666,7 @@ bool CEnclave::update_debug_flag(uint8_t debug_flag)
     return TRUE;
 }
 
-/* Begin: Added by Pinghai */
+/* Begin: Added by ratel authors */
 CEnclave *g_DBI_enclave = NULL;
 
 void finalize_DBI_enclave(const sgx_enclave_id_t enclave_id)

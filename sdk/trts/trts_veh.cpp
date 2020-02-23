@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2018-2020 Ratel Authors.  All rights reserved.
  * Copyright (C) 2011-2018 Intel Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -190,7 +191,7 @@ extern "C" __attribute__((regparm(1))) void continue_execution(sgx_exception_inf
 //      the 2nd phrase exception handing, which traverse registered exception handlers.
 //      if the exception can be handled, then continue execution
 //      otherwise, throw abortion, go back to 1st phrase, and call the default handler.
-/* Begin: Modified by Pinghai */
+/* Begin: Modified by ratel authors */
 /* sgxapp: false -> naive signals like SIGSEGV and SIGKILL; true -> communication signal like SIGALRM and SIGCHLD
  * The formmer is supported by vallina SGXSDK, the latter is introduced by SGX-DBI
  */
@@ -290,7 +291,7 @@ failed_end:
     thread_data->exception_flag = -1; // mark the current exception cannot be handled
     abort();    // throw abortion
 }
-/* End: Modified by Pinghai */
+/* End: Modified by ratel authors */
 
 
 /* We don't consider nested signal */
@@ -334,7 +335,7 @@ extern "C" __attribute__((regparm(1))) void internal_handle_DBI_inside_signal(vo
 
     _internal_handle_exception((sgx_exception_info_t*)thread_data->signal_info, true);
 }
-/* End: Added by Pinghai */
+/* End: Added by ratel authors */
 
 extern "C" uintptr_t get_sdk_signal_stack(void)
 {
@@ -426,7 +427,7 @@ trts_handle_exception(void *tcs, void *ms)
 #endif
 
 
-    /* Begin: Added by Pinghai */
+    /* Begin: Added by ratel authors */
     /* Give high privilege to SGX-DBI if it has registered signal handlers */
     if (g_first_node != NULL)
     {
@@ -461,7 +462,7 @@ trts_handle_exception(void *tcs, void *ms)
         ssa_gpr->REG(ip) = (size_t)internal_handle_exception; // prepare the ip for 2nd phrase handling
     }
 
-    /* End: Added by Pinghai */
+    /* End: Added by ratel authors */
     ssa_gpr->REG(sp) = (size_t)get_sdk_signal_stack();      // Reuse SDK stack for ERESUMEing to internal_handle_exception
     ssa_gpr->REG(ax) = (size_t)info;        // 1st parameter (info) for LINUX32
     ssa_gpr->REG(di) = (size_t)info;        // 1st parameter (info) for LINUX64, LINUX32 also uses it while restoring the context
@@ -476,7 +477,7 @@ default_handler:
     return SGX_ERROR_ENCLAVE_CRASHED;
 }
 
-/* Begin: Added by Pinghai */
+/* Begin: Added by ratel authors */
 /* Don't modify the order of RSP */
 typedef struct _simu_pt_gregs
 {
@@ -616,4 +617,4 @@ default_handler:
     g_enclave_state = ENCLAVE_CRASHED;
     return SGX_ERROR_ENCLAVE_CRASHED;
 }
-/* End: Added by Pinghai */
+/* End: Added by ratel authors */

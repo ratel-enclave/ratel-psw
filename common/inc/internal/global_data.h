@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2018-2020 Ratel Authors.  All rights reserved.
  * Copyright (C) 2011-2018 Intel Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -51,12 +52,12 @@ typedef struct _global_data_t
     sys_word_t     heap_offset;
     sys_word_t     heap_size;
     sys_word_t     thread_policy;
-	/* Begin: Added by Pinghai */
+	/* Begin: Added by ratel authors */
     sys_word_t     dyRIO_cache_offset;  // dynamoRIO's code-cache
     sys_word_t     dyRIO_cache_size;
     sys_word_t     prog_arena_offset;   // target program's modules
     sys_word_t     prog_arena_size;
-    /* End: Added by Pinghai */
+    /* End: Added by ratel authors */
 	thread_data_t  td_template;
     uint8_t        tcs_template[TCS_TEMPLATE_SIZE];
     uint32_t       layout_entry_num;
@@ -73,9 +74,9 @@ typedef struct _global_data_t
 extern "C" {
 #endif
 extern SE_DECLSPEC_EXPORT global_data_t const volatile g_global_data;
-/* Begin: Added by Pinghai */
+/* Begin: Added by ratel authors */
 extern void* g_enclave_image_base;
-/* End: Added by Pinghai */
+/* End: Added by ratel authors */
 extern uint32_t g_enclave_state;
 extern sdk_version_t g_sdk_version;
 extern int EDMM_supported;

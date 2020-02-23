@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2018-2020 Ratel Authors.  All rights reserved.
  * Copyright (C) 2011-2018 Intel Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -289,7 +290,7 @@ static bool is_utility_thread()
     }
 }
 
-/* Begin: Added by Pinghai */
+/* Begin: Added by ratel authors */
 #define TLS_TYPE_TCS_TD     0x1      // Use bit 1
 #define PAGE_SIZE   4096
 
@@ -315,12 +316,12 @@ static void init_master_tls(void* tcs, thread_data_t *td)
     td->flags = thread_flags;
     init_static_stack_canary(tcs);
 
-    /* Begin: Added by Pinghai */
+    /* Begin: Added by ratel authors */
     td->self_addr |= TLS_TYPE_TCS_TD;
     td->master_tls = td;
     td->cur_fs_seg = td;
     td->cur_gs_seg = td;
-    /* End: Added by Pinghai */
+    /* End: Added by ratel authors */
 }
 
 
@@ -332,7 +333,7 @@ extern "C" void init_slave_tls(void *tls_segment)
     thread_data_t *td_slave = (thread_data_t*)tls_segment;
     td_slave->master_tls = td_master;
 }
-/* End: Added by Pinghai */
+/* End: Added by ratel authors */
 
 extern "C" void initialize_signal_frame(thread_data_t *td);
 
@@ -347,10 +348,10 @@ sgx_status_t do_init_thread(void *tcs)
     bool thread_first_init = (saved_stack_commit_addr == 0) ? true : false;
 #endif
 
-    /* Begin: Modified by Pinghai */
+    /* Begin: Modified by ratel authors */
     init_master_tls(tcs, thread_data);
     initialize_signal_frame(thread_data);
-    /* End: Modified by Pinghai */
+    /* End: Modified by ratel authors */
 
 #ifndef SE_SIM
     if (EDMM_supported && is_dynamic_thread(tcs))

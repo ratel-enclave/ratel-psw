@@ -70,13 +70,13 @@
 #define xsave_size          (SE_WORDSIZE * 7)
 #define stack_guard         (SE_WORDSIZE * 5)
 
-/* Begin: Added by Pinghai */
+/* Begin: Added by ratel authors */
 #define master_tls			(SE_WORDSIZE *20)
 #define cur_fs_seg			(SE_WORDSIZE *21)
 #define cur_gs_seg			(SE_WORDSIZE *22)
 
 #define TLS_TYPE_TCS_TD     0x1      // Use bit 0
-/* End: Added by Pinghai */
+/* End: Added by ratel authors */
 
 /* SSA GPR */
 #define ssa_sp_t            32
@@ -120,7 +120,7 @@
 #endif /* !SE_SIM */
 .endm
 
-/* Begin: Added by Pinghai */
+/* Begin: Added by ratel authors */
 .macro GET_MASTER_TLS_SEG
 #if defined(LINUX64)
     mov     %fs:self_addr, %xax
@@ -158,7 +158,7 @@
 2:
 #endif
 .endm
-/* End: Modified by Pinghai */
+/* End: Modified by ratel authors */
 
 .macro GET_STACK_BASE tcs
     mov      \tcs, %xax

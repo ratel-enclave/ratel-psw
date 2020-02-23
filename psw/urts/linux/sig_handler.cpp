@@ -86,20 +86,20 @@ extern "C" void *get_aep();
 extern "C" void *get_eenterp();
 extern "C" void *get_eretp();
 static struct sigaction g_old_sigact[_NSIG];
-/* Begin: Modified by pinghai */
+/* Begin: Modified by ratel authors */
 static bool sgxapp_sigact[_NSIG];   // sgx-app register signal handlers?
-/* End: Modified by pinghai */
+/* End: Modified by ratel authors */
 
-/* Begin: Added by Pinghai */
+/* Begin: Added by ratel authors */
 /* A package stores all contxt information, compatible with DynamoRIO's sigframe_rt_t */
 typedef struct _sigcxt_pkg_t {
     int             signum;
     ucontext_t      ctx;
     siginfo_t       info;
 }sigcxt_pkg_t;
-/* End: Added by Pinghai */
+/* End: Added by ratel authors */
 
-/* Begin: Added by Pinghai */
+/* Begin: Added by ratel authors */
 void hand_signal_outside_sgx(int signum, siginfo_t* siginfo, void *priv)
 {
     SE_TRACE(SE_TRACE_DEBUG, "Hand signal outside SGX\n");
@@ -148,9 +148,9 @@ bool hand_signal_inside_SGXDBI(sigcxt_pkg_t *pkg)
 
     return (SGX_SUCCESS == ret);
 }
-/* End: Added by Pinghai */
+/* End: Added by ratel authors */
 
-/* Begin: Modified by Pinghai */
+/* Begin: Modified by ratel authors */
 void master_sig_handler(int signum, siginfo_t* siginfo, void *priv)
 {
     SE_TRACE(SE_TRACE_DEBUG, "signal handler is triggered\n");
@@ -177,12 +177,12 @@ void master_sig_handler(int signum, siginfo_t* siginfo, void *priv)
             //If exception is raised in trts again and again, the SSA will overflow, and finally it is EENTER exception.
             assert(reinterpret_cast<tcs_t *>(xbx) == param->tcs);
             CEnclave *enclave = param->trust_thread->get_enclave();
-            /* Begin: Added by Pinghai */
+            /* Begin: Added by ratel authors */
             pkg = new sigcxt_pkg_t; // fix-me: please free it!
             pkg->signum = signum;
             memcpy(&pkg->info, siginfo, sizeof(siginfo_t));
             memcpy(&pkg->ctx, context, sizeof(ucontext_t));
-            /* End: Added by Pinghai */
+            /* End: Added by ratel authors */
 
             unsigned int ret = enclave->ecall(ECMD_EXCEPT, param->ocall_table, pkg);
 
@@ -263,7 +263,7 @@ void master_sig_handler(int signum, siginfo_t* siginfo, void *priv)
         }
     }
 }
-/* End: Modified by Pinghai */
+/* End: Modified by ratel authors */
 
 void reg_sig_handler(void)
 {
@@ -303,7 +303,7 @@ void reg_sig_handler(void)
     // if (0 != ret) sgxapp_reg_sighandler(0);
 }
 
-/* Begin: Added by Pinghai */
+/* Begin: Added by ratel authors */
 void sgxapp_reg_sighandler(int signum)
 {
     struct sigaction sig_act;
@@ -329,7 +329,7 @@ void sgxapp_reg_sighandler(int signum)
     if (0 != ret)
         abort();
 }
-/* End: Added by Pinghai */
+/* End: Added by ratel authors */
 
 //trust_thread is saved at stack for ocall.
 #define enter_enclave __morestack

@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2018-2020 Ratel Authors.  All rights reserved.
  * Copyright (C) 2011-2018 Intel Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,7 +36,7 @@
 
 void reg_sig_handler(void);
 
-/* Begin: Added by Pinghai */
+/* Begin: Added by ratel authors */
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -48,6 +49,6 @@ void sgxapp_reg_sighandler(int signum);
 #ifdef __cplusplus
 }
 #endif
-/* End: Added by Pinghai */
+/* End: Added by ratel authors */
 
 #endif

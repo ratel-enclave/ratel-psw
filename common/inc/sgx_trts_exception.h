@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2018-2020 Ratel Authors.  All rights reserved.
  * Copyright (C) 2011-2018 Intel Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -108,9 +109,9 @@ typedef struct _exception_info_t
     sgx_cpu_context_t      cpu_context;
     sgx_exception_vector_t exception_vector;
     sgx_exception_type_t   exception_type;
-	/* Begin: Added by Pinghai */
+	/* Begin: Added by ratel authors */
     void*                  sigcxt_pkg;  /* pointing to external structure that keeps all informaiton */
-	/* End: Added by Pinghai */
+	/* End: Added by ratel authors */
 } sgx_exception_info_t;
 
 typedef int (*sgx_exception_handler_t)(sgx_exception_info_t *info);

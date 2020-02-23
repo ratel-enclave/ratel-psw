@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2018-2020 Ratel Authors.  All rights reserved.
  * Copyright (C) 2011-2018 Intel Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -71,7 +72,7 @@ static void init_stack_guard(void *tcs)
     thread_data->stack_guard = tmp_stack_guard;
 }
 
-/* Begin: Added by Pinghai */
+/* Begin: Added by ratel authors */
 #define UPDATE_FS 10
 #define UPDATE_GS 20
 
@@ -170,7 +171,7 @@ eexit_update_lastsp(void *last_sp)
     td_master->cur_gs_seg = td_gs
     */
 }
-/* End: Added by Pinghai */
+/* End: Added by ratel authors */
 
 extern "C"
 int enter_enclave(int index, void *ms, void *tcs, int cssa)
@@ -207,12 +208,12 @@ int enter_enclave(int index, void *ms, void *tcs, int cssa)
         {
             error = do_uninit_enclave(tcs);
         }
-		/* Begin: Added by Pinghai */
+		/* Begin: Added by ratel authors */
         else if (index == ECMD_SIGNAL)
         {
             error = trts_handle_outside_signal(tcs, ms);
         }
-		/* End: Added by Pinghai */
+		/* End: Added by ratel authors */
     }
     else if((cssa == 1) && (index == ECMD_EXCEPT))
     {

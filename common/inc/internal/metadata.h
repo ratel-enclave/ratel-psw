@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2018-2020 Ratel Authors.  All rights reserved.
  * Copyright (C) 2011-2018 Intel Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -73,10 +74,10 @@
 #define STACK_SIZE_MAX 0x40000
 #define HEAP_SIZE_MIN 0x1000
 #define HEAP_SIZE_MAX 0x1000000
-/* Begin: Added by Pinghai */
+/* Begin: Added by ratel authors */
 #define DYRIO_CODE_CACHE_SIZE 0
 #define SGXEV_PROG_ARENA_SIZE 0
-/* End: Added by Pinghai */
+/* End: Added by ratel authors */
 #define DEFAULT_MISC_SELECT 0
 #define DEFAULT_MISC_MASK 0xFFFFFFFF
 
@@ -116,10 +117,10 @@ typedef enum
 #define LAYOUT_ID_STACK_DYN_MAX 17
 #define LAYOUT_ID_STACK_DYN_MIN 18
 #define LAYOUT_ID_THREAD_GROUP_DYN GROUP_ID(19)
-/* Begin: Added by Pinghai */
+/* Begin: Added by ratel authors */
 #define LAYOUT_ID_DYRIO_CODE_CACHE 20
 #define LAYOUT_ID_SGXEV_PROG_ARENA 21
-/* End: Added by Pinghai */
+/* End: Added by ratel authors */
 
 /*
 **    layout table example

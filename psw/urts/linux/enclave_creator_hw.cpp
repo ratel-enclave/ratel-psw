@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2018-2020 Ratel Authors.  All rights reserved.
  * Copyright (C) 2011-2018 Intel Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -55,9 +56,9 @@
 
 #define SGX_CPUID   0x12
 
-/* Begin: Added by Pinghai */
+/* Begin: Added by ratel authors */
 #define ENCLAVE_START_ADDR (void*)0x600000000000
-/* End: Added by Pinghai */
+/* End: Added by ratel authors */
 
 static EnclaveCreatorHW g_enclave_creator_hw;
 
@@ -134,9 +135,9 @@ int EnclaveCreatorHW::create_enclave(secs_t *secs, sgx_enclave_id_t *enclave_id,
 
     //SECS:BASEADDR must be naturally aligned on an SECS.SIZE boundary
     //This alignment is guaranteed by driver
-	/* Begin: Modified by Pinghai */
+	/* Begin: Modified by ratel authors */
     void* enclave_base = mmap(ENCLAVE_START_ADDR, (size_t)secs->size, PROT_NONE, MAP_SHARED|MAP_FIXED, m_hdevice, 0);
-	/* End: Modified by Pinghai */
+	/* End: Modified by ratel authors */
 	if(enclave_base == MAP_FAILED)
     {
         SE_TRACE(SE_TRACE_WARNING, "\ncreate enclave: mmap failed, errno = %d\n", errno);

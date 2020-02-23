@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2018-2020 Ratel Authors.  All rights reserved.
  * Copyright (C) 2011-2018 Intel Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -116,7 +117,7 @@ typedef struct _thread_data_t
     sys_word_t  cxx_thread_info[6];
     sys_word_t  stack_commit_addr;
 
-    /* Begin: Added by Pinghai */
+    /* Begin: Added by ratel authors */
     void    *master_tls;    /* always pointing to the tls-segment bound to TCS */
 
     /*Load them when do_ret */
@@ -126,7 +127,7 @@ typedef struct _thread_data_t
     /* All fields may be used by thread-global private data */
     void    *thread_hcxt;
     void    *signal_info;   /* Point to signal info created inside-SGX */
-    /* End: Added by Pinghai */
+    /* End: Added by ratel authors */
 } thread_data_t;
 
 #ifdef __cplusplus
@@ -136,7 +137,7 @@ extern "C" {
 /* Always return the tls-segment bound to TCS, which is an instance of thread_data_t */
 thread_data_t *get_thread_data(void);
 
-/* Begin: Added by Pinghai */
+/* Begin: Added by ratel authors */
 #if defined(LINUX64)
 void init_slave_tls(void *tls_segment);
 void oret_load_slave_tls(void);
@@ -147,7 +148,7 @@ void eexit_update_lastsp(void *last_sp);
 void load_segment_fs(void *tls_segment);
 void load_segment_gs(void *tls_segment);
 #endif
-/* End: Added by Pinghai */
+/* End: Added by ratel authors */
 
 #ifdef __cplusplus
 }
