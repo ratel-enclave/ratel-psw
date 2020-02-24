@@ -1,25 +1,17 @@
-Intel(R) Software Guard Extensions for Linux\* OS
-================================================
-
-# linux-sgx
+Intel SGX Linux PSW for Ratel
+=============================
 
 Introduction
 ------------
 Intel(R) Software Guard Extensions (Intel(R) SGX) is an Intel technology for application developers seeking to protect select code and data from disclosure or modification.
 
-The Linux\* Intel(R) SGX software stack is comprised of the Intel(R) SGX driver, the Intel(R) SGX SDK, and the Intel(R) SGX Platform Software (PSW). The Intel(R) SGX SDK and Intel(R) SGX PSW are hosted in the [linux-sgx](https://github.com/01org/linux-sgx) project.
+The Linux Ratel SGX software stack is comprised of the Intel(R) SGX driver, the Ratel SGX SDK, and the Ratel SGX Platform Software (PSW). Thanks to the open-sourced the Intel(R) SGX SDK and PSW, please note that we implement the SGX SDK and PSW for Ratel based on the released Intel(R) sources. The Intel(R) SGX SDK and Intel(R) SGX PSW are officially hosted in the [linux-sgx](https://github.com/01org/linux-sgx) project. So the building and installing instructions on them are similar except minimal changes.
 
-The [linux-sgx-driver](https://github.com/01org/linux-sgx-driver) project hosts the out-of-tree driver for the Linux\* Intel(R) SGX software stack, which will be used until the driver upstreaming process is complete. 
-
-The repository provides a reference implementation of a Launch Enclave for 'Flexible Launch Control' under [psw/ae/ref_le](psw/ae/ref_le). The reference LE implemenation can be used as a basis for enforcing different launch control policy by the platform developer or owner. To build and try it by yourself, please refer to the [ref_le.md](psw/ae/ref_le/ref_le.md) for details.
+The [linux-sgx-driver](https://github.com/01org/linux-sgx-driver) project hosts the out-of-tree driver for the Linux\* Intel(R) SGX software stack, which will be used until the driver upstreaming process is complete. Alternatively, you can find it from [ratel-sgx-driver](https://github.com/ratel-enclave/ratel-driver).
 
 License
 -------
 See [License.txt](License.txt) for details.
-
-Contributing
--------
-See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 Documentation
 -------------
@@ -130,39 +122,6 @@ Install the Intel(R) SGX PSW
   * On SUSE Linux Enterprise Server 12:  
   ```
     $ sudo zypper install libopenssl-devel libcurl-devel protobuf-devel
-  ```
-- To use Trusted Platform Service functions:  
-  Ensure `mei_me` driver is enabled and `/dev/mei0` exists.  
-  Download [iclsClient](https://software.intel.com/en-us/sgx-sdk/download) and install it using the following commands:  
-  * On Ubuntu 16.04:
-  ```
-    $ sudo apt-get install alien
-    $ sudo alien --scripts iclsClient-1.45.449.12-1.x86_64.rpm
-    $ sudo dpkg -i iclsclient_1.45.449.12-2_amd64.deb
-  ```
-  * On Red Hat Enterprise Linux 7.4 and CentOS 7.4:  
-  ```
-    $ sudo yum install iclsClient-1.45.449.12-1.x86_64.rpm
-  ```
-  * On SUSE Linux Enterprise Server 12:  
-  ```
-    $ sudo zypper install iclsClient-1.45.449.12-1.x86_64.rpm
-  ```
-  Download source code from [dynamic-application-loader-host-interface](https://github.com/01org/dynamic-application-loader-host-interface) project. In the source code folder, build and install the `JHI` service using the following commands:
-  * On Ubuntu 16.04:
-  ```
-    $ sudo apt-get install uuid-dev libxml2-dev cmake pkg-config
-    $ cmake .;make;sudo make install;sudo systemctl enable jhi
-  ```
-  * On Red Hat Enterprise Linux 7.4 and CentOS 7.4:  
-  ```
-    $ sudo yum install libuuid-devel libxml2-devel cmake pkgconfig
-    $ cmake .;make;sudo make install;sudo ldconfig;sudo systemctl enable jhi
-  ```
-  * On SUSE Linux Enterprise Server 12:  
-  ```
-    $ sudo zypper install libuuid-devel libxml2-devel cmake pkg-config
-    $ cmake .;make;sudo make install;sudo ldconfig;sudo systemctl enable jhi
   ```
 
 ### Install the Intel(R) SGX PSW
