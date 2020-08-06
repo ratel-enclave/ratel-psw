@@ -1,17 +1,23 @@
-Intel SGX Linux PSW for Ratel
-=============================
+Intel(R) Software Guard Extensions for Linux\* OS
+================================================
+
+# linux-sgx
 
 Introduction
 ------------
 Intel(R) Software Guard Extensions (Intel(R) SGX) is an Intel technology for application developers seeking to protect select code and data from disclosure or modification.
 
-The Linux Ratel SGX software stack is comprised of the Intel(R) SGX driver, the Ratel SGX SDK, and the Ratel SGX Platform Software (PSW). Thanks to the open-sourced the Intel(R) SGX SDK and PSW, please note that we implement the SGX SDK and PSW for Ratel based on the released Intel(R) sources. The Intel(R) SGX SDK and Intel(R) SGX PSW are officially hosted in the [linux-sgx](https://github.com/01org/linux-sgx) project. So the building and installing instructions on them are similar except minimal changes.
+The Linux\* Intel(R) SGX software stack is comprised of the Intel(R) SGX driver, the Intel(R) SGX SDK, and the Intel(R) SGX Platform Software (PSW). The Intel(R) SGX SDK and Intel(R) SGX PSW are hosted in the [linux-sgx](https://github.com/01org/linux-sgx) project.
 
-The [linux-sgx-driver](https://github.com/01org/linux-sgx-driver) project hosts the out-of-tree driver for the Linux\* Intel(R) SGX software stack, which will be used until the driver upstreaming process is complete. Alternatively, you can find it from [ratel-sgx-driver](https://github.com/ratel-enclave/ratel-driver).
+The [linux-sgx-driver](https://github.com/01org/linux-sgx-driver) project hosts the out-of-tree driver for the Linux\* Intel(R) SGX software stack, which will be used until the driver upstreaming process is complete. 
 
 License
 -------
 See [License.txt](License.txt) for details.
+
+Contributing
+-------
+See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 Documentation
 -------------
@@ -26,24 +32,13 @@ Build the Intel(R) SGX PSW Package
 -------------------------------------------------------
 ### Prerequisites:
 - Ensure that you have one of the following required operating systems:  
-  * Ubuntu\* 16.04.3 LTS Desktop 64bits
-  * Ubuntu\* 16.04.3 LTS Server 64bits
-  * Red Hat Enterprise Linux Server release 7.4 64bits
-  * CentOS 7.4.1708 64bits
-  * SUSE Linux Enterprise Server 12 64bits
+  * Ubuntu\* 16.04.1 LTS Desktop 64bits
+  * Ubuntu\* 16.04.1 LTS Server 64bits
 
 - Use the following command to install additional required tools to build the Intel(R) SGX PSW:  
   * On Ubuntu 16.04:
   ```
     $ sudo apt-get install libssl-dev libcurl4-openssl-dev protobuf-compiler libprotobuf-dev
-  ```
-  * On Red Hat Enterprise Linux 7.4 and CentOS 7.4:
-  ```
-    $ sudo yum install openssl-devel libcurl-devel protobuf-devel
-  ```
-  * On SUSE Linux Enterprise Server 12:
-  ```
-    $ sudo zypper install libopenssl-devel libcurl-devel protobuf-devel
   ```
 - Use the script ``download_prebuilt.sh`` inside source code package to download prebuilt binaries to prebuilt folder  
   You may need set an https proxy for the `wget` tool used by the script (such as ``export https_proxy=http://test-proxy:test-port``)  
@@ -60,14 +55,6 @@ The following steps describe how to build the Intel(R) SGX PSW. You can build th
   You can find the tools and libraries generated in the `build/linux` directory.  
   **Note**: You can also go to the `sdk` folder and use the `make` command to build the Intel(R) SGX SDK component only. However, building the PSW component is dependent on the result of building the Intel(R) SGX SDK.  
 
-- This repository supports to build the Intel(R) SGX SDK based on either precompiled optimized IPP/string/math libraries or open sourced version of SGXSSL/string/math libraries. 
-  The default build uses precompiled optimized libraries, which are downloaded by the script ``./download_prebuilt.sh``.
-  You can also use the open sourced version implementation instead by entering the following command:
-```
-  $ make USE_OPT_LIBS=0
-```
-  **Note**: Building the Intel(R) SGX PSW with open sourced SGXSSL/string/math libraries is not supported. The above command builds Intel(R) SGX SDK only and the build of PSW part will be skipped.
-
 - To build Intel(R) SGX PSW with debug information, enter the following command:  
 ```
   $ make DEBUG=1
@@ -76,13 +63,6 @@ The following steps describe how to build the Intel(R) SGX PSW. You can build th
 ```
   $ make clean
 ```
-
-- The build above uses prebuilt Intel(R) Architecture Enclaves(LE/PvE/QE/PCE/PSE-OP/PSE-PR) and applet(PSDA) - the files ``psw/ae/data/prebuilt/libsgx_*.signed.so`` and ``psw/ae/data/prebuilt/PSDA.dalp``, which have been signed by Intel in advance.
-  To build those enclaves by yourself (without a signature), first you need to build both Intel(R) SGX PSW with the default configuration. After that, you can build each Architecture Enclave by using the `make` command from the corresponding folder:
-```
-  $ cd psw/ae/le
-  $ make
-``` 
 
 ### Build the Intel(R) SGX PSW Installer
 To build the Intel(R) SGX PSW installer, enter the following command:
@@ -101,11 +81,8 @@ Install the Intel(R) SGX PSW
 ----------------------------
 ### Prerequisites
 - Ensure that you have one of the following operating systems:  
-  * Ubuntu\* 16.04.3 LTS Desktop 64bits
-  * Ubuntu\* 16.04.3 LTS Server 64bits
-  * Red Hat Enterprise Linux Server release 7.4 64bits
-  * CentOS 7.4.1708 64bits
-  * SUSE Linux Enterprise Server 12 64bits
+  * Ubuntu\* 16.04.1 LTS Desktop 64bits
+  * Ubuntu\* 16.04.1 LTS Server 64bits
 - Ensure that you have a system with the following required hardware:  
   * 6th Generation Intel(R) Core(TM) Processor or newer
 - Configure the system with the **Intel SGX hardware enabled** option and install Intel(R) SGX driver in advance.  
@@ -115,15 +92,6 @@ Install the Intel(R) SGX PSW
   ```
     $ sudo apt-get install libssl-dev libcurl4-openssl-dev libprotobuf-dev
   ```
-  * On Red Hat Enterprise Linux 7.4 and CentOS 7.4:  
-  ```
-    $ sudo yum install openssl-devel libcurl-devel protobuf-devel
-  ```
-  * On SUSE Linux Enterprise Server 12:  
-  ```
-    $ sudo zypper install libopenssl-devel libcurl-devel protobuf-devel
-  ```
-
 ### Install the Intel(R) SGX PSW
 To install the Intel(R) SGX PSW, invoke the installer with root privilege:  
 ```
