@@ -103,7 +103,7 @@ typedef struct _sigcxt_pkg_t {
 /* Begin: Added by ratel authors */
 void hand_signal_outside_sgx(int signum, siginfo_t* siginfo, void *priv)
 {
-    SE_TRACE(SE_TRACE_DEBUG, "Hand signal outside SGX\n");
+    SE_TRACE(SE_TRACE_DEBUG, "Hand signal outside SGX!\n");
 
     //it is not SE exception. if the old signal handler is default signal handler, we reset signal handler.
     //raise the signal again, and the default signal handler will be called.
@@ -142,7 +142,7 @@ void hand_signal_outside_sgx(int signum, siginfo_t* siginfo, void *priv)
 
 bool hand_signal_inside_SGXDBI(sigcxt_pkg_t *pkg)
 {
-    SE_TRACE(SE_TRACE_DEBUG, "Hand signal inside SGX\n");
+    SE_TRACE(SE_TRACE_DEBUG, "Hand signal inside SGX!\n");
     //The ecall looks recursively, but it will not cause infinite call.
     //If exception is raised in trts again and again, the SSA will overflow, and finally it is EENTER exception.
     unsigned int ret = g_DBI_enclave->ecall(ECMD_SIGNAL, NULL, pkg);
@@ -154,7 +154,7 @@ bool hand_signal_inside_SGXDBI(sigcxt_pkg_t *pkg)
 /* Begin: Modified by ratel authors */
 void master_sig_handler(int signum, siginfo_t* siginfo, void *priv)
 {
-    SE_TRACE(SE_TRACE_DEBUG, "signal handler is triggered\n");
+    SE_TRACE(SE_TRACE_DEBUG, "signal handler is triggered!\n");
     ucontext_t* context = reinterpret_cast<ucontext_t *>(priv);
     unsigned int *xip = reinterpret_cast<unsigned int *>(context->uc_mcontext.gregs[REG_XIP]);
     size_t xax = context->uc_mcontext.gregs[REG_XAX];
@@ -173,7 +173,7 @@ void master_sig_handler(int signum, siginfo_t* siginfo, void *priv)
         {
             assert(ENCLU == (*xip & 0xffffff));
             //suppose the exception is within enclave.
-            SE_TRACE(SE_TRACE_NOTICE, "exception on ERESUME\n");
+            SE_TRACE(SE_TRACE_NOTICE, "exception on ERESUME!\n");
             //The ecall looks recursively, but it will not cause infinite call.
             //If exception is raised in trts again and again, the SSA will overflow, and finally it is EENTER exception.
             assert(reinterpret_cast<tcs_t *>(xbx) == param->tcs);
@@ -194,9 +194,9 @@ void master_sig_handler(int signum, siginfo_t* siginfo, void *priv)
                 return;
             }
             //If the exception is caused by enclave lost or internal stack overrun, then return the error code to ecall caller elegantly.
-            else if(SGX_ERROR_ENCLAVE_LOST == ret /*|| SGX_ERROR_STACK_OVERRUN == ret*/)
+            else if(SGX_ERROR_ENCLAVE_LOST == ret || SGX_ERROR_STACK_OVERRUN == ret)
             {
-                SE_TRACE(SE_TRACE_WARNING, "master_sig_handler -->> SGX_ERROR_STACK_OVERRUN!!!\n");
+                SE_TRACE(SE_TRACE_WARNING, "master_sig_handler -->> SGX_ERROR_STACK_OVERRUN!\n");
                 //enter_enlcave function will return with ret which is from tRTS;
                 context->uc_mcontext.gregs[REG_XIP] = reinterpret_cast<greg_t>(get_eretp());
                 context->uc_mcontext.gregs[REG_XSI] = ret;
@@ -209,7 +209,7 @@ void master_sig_handler(int signum, siginfo_t* siginfo, void *priv)
             CEnclavePool::instance()->unref_enclave(enclave);
         }
         else {
-            SE_TRACE(SE_TRACE_NOTICE, "Unexpected signal, fix-me\n");
+            SE_TRACE(SE_TRACE_NOTICE, "Unexpected signal, fix-me!\n");
         }
     }
 
@@ -220,35 +220,27 @@ void master_sig_handler(int signum, siginfo_t* siginfo, void *priv)
         {
             assert(reinterpret_cast<tcs_t *>(xbx) == param->tcs);
             assert(ENCLU == (*xip & 0xffffff));
-            SE_TRACE(SE_TRACE_NOTICE, "exception on EENTER\n");
+            SE_TRACE(SE_TRACE_NOTICE, "exception on EENTER!\n");
             //enter_enlcave function will return with SE_ERROR_ENCLAVE_LOST
             context->uc_mcontext.gregs[REG_XIP] = reinterpret_cast<greg_t>(get_eretp());
             context->uc_mcontext.gregs[REG_XSI] = SGX_ERROR_ENCLAVE_LOST;
             return;
         }
         else {
-            SE_TRACE(SE_TRACE_NOTICE, "exception on EENTER\n");
+            SE_TRACE(SE_TRACE_NOTICE, "exception on EENTER!\n");
         }
     }
 
     // signal triggred when running out-sgx code
     else {
-        SE_TRACE(SE_TRACE_DEBUG, "Signal %d is triggered when running outside code\n", signum);
+        SE_TRACE(SE_TRACE_DEBUG, "Signal %d is triggered when running outside code!\n", signum);
 
-        bool bException = ((signum == SIGILL) || //Illegal instruction
-                (signum == SIGABRT) || // Abort
-                (signum == SIGSEGV) || // page fault
-                (signum == SIGBUS) || // Bus error (bad memory access)
-                (signum == SIGSYS) ||   // Bad argument to routine (SVr4)
-                (signum == SIGTRAP) || // Trace/breakpoint trap
-                (signum == SIGFPE)); // Floating point exception
+        bool bException = ((signum == SIGSEGV));
 
         if (bException) {
             hand_signal_outside_sgx(signum, siginfo, priv);
         }
         else {
-            bool bStop = false;
-
             // Give sgx-app prior to deal with signals
             if (sgxapp_sigact[signum]) {
                 pkg = new sigcxt_pkg_t;
@@ -256,11 +248,8 @@ void master_sig_handler(int signum, siginfo_t* siginfo, void *priv)
                 memcpy(&pkg->info, siginfo, sizeof(siginfo_t));
                 memcpy(&pkg->ctx, context, sizeof(ucontext_t));
 
-                bStop = hand_signal_inside_SGXDBI(pkg);
+                hand_signal_inside_SGXDBI(pkg);
             }
-
-            if (!bStop)
-                hand_signal_outside_sgx(signum, siginfo, priv);
         }
     }
 }
@@ -271,7 +260,7 @@ void reg_sig_handler(void)
     struct sigaction sig_act;
     int ret = 0;
 
-    SE_TRACE(SE_TRACE_DEBUG, "signal handler is registered\n");
+    SE_TRACE(SE_TRACE_DEBUG, "signal handler is registered!\n");
     memset(&sig_act, 0, sizeof(sig_act));
     sig_act.sa_sigaction = master_sig_handler;
     sig_act.sa_flags = SA_SIGINFO | SA_NODEFER | SA_RESTART;
@@ -284,24 +273,10 @@ void reg_sig_handler(void)
     else
     {
         sigdelset(&sig_act.sa_mask, SIGSEGV);
-        sigdelset(&sig_act.sa_mask, SIGFPE);
-        sigdelset(&sig_act.sa_mask, SIGILL);
-        sigdelset(&sig_act.sa_mask, SIGBUS);
-        sigdelset(&sig_act.sa_mask, SIGTRAP);
     }
 
     ret = sigaction(SIGSEGV, &sig_act, &g_old_sigact[SIGSEGV]);
     if (0 != ret) abort();
-    ret = sigaction(SIGFPE, &sig_act, &g_old_sigact[SIGFPE]);
-    if (0 != ret) abort();
-    ret = sigaction(SIGILL, &sig_act, &g_old_sigact[SIGILL]);
-    if (0 != ret) abort();
-    ret = sigaction(SIGBUS, &sig_act, &g_old_sigact[SIGBUS]);
-    if (0 != ret) abort();
-    ret = sigaction(SIGTRAP, &sig_act, &g_old_sigact[SIGTRAP]);
-    if (0 != ret) abort();
-    /* making sgxapp_register_sighandler unresolved for exporting */
-    // if (0 != ret) sgxapp_reg_sighandler(0);
 }
 
 /* Begin: Added by ratel authors */
@@ -309,6 +284,8 @@ void sgxapp_reg_sighandler(int signum)
 {
     struct sigaction sig_act;
     int ret = 0;
+
+    SE_TRACE(SE_TRACE_DEBUG, "sgxapp signal handler is registered!\n");
 
     /* Not allowed to register handlers for these signals */
     assert(signum != SIGKILL && signum != SIGSTOP);
@@ -328,7 +305,10 @@ void sgxapp_reg_sighandler(int signum)
     }
 
     if (0 != ret)
+    {
+        SE_TRACE(SE_TRACE_DEBUG, "sgxapp_reg_sighandler abort!\n");
         abort();
+    }
 }
 /* End: Added by ratel authors */
 

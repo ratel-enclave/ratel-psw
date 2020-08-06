@@ -58,6 +58,11 @@ static sgx_status_t is_ecall_allowed(uint32_t ordinal)
     {
         return SGX_ERROR_INVALID_FUNCTION;
     }
+    if (IS_NEW_THREAD_ECALL == ordinal)
+    {
+        return SGX_SUCCESS;
+    }
+
     thread_data_t *thread_data = get_thread_data();
     if(thread_data->last_sp == thread_data->stack_base_addr)
     {
@@ -77,10 +82,7 @@ static sgx_status_t is_ecall_allowed(uint32_t ordinal)
     {
         return SGX_ERROR_INVALID_FUNCTION;
     }
-    if (IS_NEW_THREAD_ECALL == (int32_t)ordinal)
-    {
-        return SGX_SUCCESS;
-    }
+    
     return (g_dyn_entry_table.entry_table[ocall_index * g_ecall_table.nr_ecall + ordinal] ? SGX_SUCCESS : SGX_ERROR_ECALL_NOT_ALLOWED);
 }
 // get_func_addr()
