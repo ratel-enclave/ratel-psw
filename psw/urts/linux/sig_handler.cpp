@@ -138,7 +138,6 @@ void hand_signal_outside_sgx(int signum, siginfo_t* siginfo, void *priv)
     }
 }
 
-
 bool hand_signal_inside_SGXDBI(sigcxt_pkg_t *pkg)
 {
     SE_TRACE(SE_TRACE_DEBUG, "Hand signal inside SGX!\n");
@@ -185,7 +184,6 @@ void master_sig_handler(int signum, siginfo_t* siginfo, void *priv)
             /* End: Added by Pinghai */
 
             unsigned int ret = enclave->ecall(ECMD_EXCEPT, param->ocall_table, pkg);
-
 
             if(SGX_SUCCESS == ret)
             {
@@ -234,21 +232,21 @@ void master_sig_handler(int signum, siginfo_t* siginfo, void *priv)
     else {
         SE_TRACE(SE_TRACE_DEBUG, "Signal %d is triggered when running outside code!\n", signum);
 
-        bool bException = ((signum == SIGSEGV));
+        // Give the first try for the in-enclave app to deal with signals
+        if (sgxapp_sigact[signum]) {
+            pkg = new sigcxt_pkg_t;
+            pkg->signum = signum;
+            memcpy(&pkg->info, siginfo, sizeof(siginfo_t));
+            memcpy(&pkg->ctx, context, sizeof(ucontext_t));
 
-        if (bException) {
-            hand_signal_outside_sgx(signum, siginfo, priv);
-        }
-        else {
-            // Give sgx-app prior to deal with signals
-            if (sgxapp_sigact[signum]) {
-                pkg = new sigcxt_pkg_t;
-                pkg->signum = signum;
-                memcpy(&pkg->info, siginfo, sizeof(siginfo_t));
-                memcpy(&pkg->ctx, context, sizeof(ucontext_t));
-
-                hand_signal_inside_SGXDBI(pkg);
+            bool bStop = hand_signal_inside_SGXDBI(pkg);
+            if (!bStop)
+            {
+                hand_signal_outside_sgx(signum, siginfo, priv);
             }
+        }
+        else {  /* if the in-enclave code cannot handle it, just give chance to the handler outside to process */
+            hand_signal_outside_sgx(signum, siginfo, priv);
         }
     }
 }
@@ -272,9 +270,21 @@ void reg_sig_handler(void)
     else
     {
         sigdelset(&sig_act.sa_mask, SIGSEGV);
+        sigdelset(&sig_act.sa_mask, SIGFPE);    
+        sigdelset(&sig_act.sa_mask, SIGILL);    
+        sigdelset(&sig_act.sa_mask, SIGBUS);    
+        sigdelset(&sig_act.sa_mask, SIGTRAP);
     }
 
-    ret = sigaction(SIGSEGV, &sig_act, &g_old_sigact[SIGSEGV]);
+    ret = sigaction(SIGSEGV, &sig_act, &g_old_sigact[SIGSEGV]); // page fault
+    if (0 != ret) abort();
+    ret = sigaction(SIGFPE, &sig_act, &g_old_sigact[SIGFPE]);   // Floating point exception
+    if (0 != ret) abort();  
+    ret = sigaction(SIGILL, &sig_act, &g_old_sigact[SIGILL]);   // Illegal instruction
+    if (0 != ret) abort();  
+    ret = sigaction(SIGBUS, &sig_act, &g_old_sigact[SIGBUS]);   // Bus error (bad memory access)
+    if (0 != ret) abort();  
+    ret = sigaction(SIGTRAP, &sig_act, &g_old_sigact[SIGTRAP]); // Trace/breakpoint trap
     if (0 != ret) abort();
 }
 
