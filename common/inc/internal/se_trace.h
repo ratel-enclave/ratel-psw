@@ -69,8 +69,8 @@ int se_trace_internal(int debug_level, const char *fmt, ...);
 #define YPHPRINT(...)
 #else /* DISABLE_TRACE */
 #define se_trace(debug_level, fmt, ...)     \
-    do {                                    \
-        if(debug_level <= SE_DEBUG_LEVEL)   \
+    do { /* printing logs will incur errors during signal-handling, so turn it off temporarily */                                   \
+        if(0 /*debug_level <= SE_DEBUG_LEVEL*/)   \
             se_trace_internal(debug_level, fmt, ##__VA_ARGS__);       \
     }while(0)
 
